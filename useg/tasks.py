@@ -6,7 +6,7 @@ import numpy as np
 
 #%%
 
-from useg.core import preprocess, watseg, process_bounds
+from useg.functions import preprocess, watseg, process_bounds
 from useg.tools.piv import bd_openpiv
 
 #%% preview
@@ -124,7 +124,7 @@ def preview(
         
         return rsize, ridges, mask, markers, labels, wat, bound_labels
 
-#%% Process
+#%% process
 
 def process(
         raw,
@@ -250,23 +250,23 @@ def process(
     
     # .........................................................................  
 
-    # start = time.time()
-    # print('Process bounds')
+    start = time.time()
+    print('Process bounds')
 
-    # rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm  = process_bounds(
-    #     rsize, 
-    #     labels, 
-    #     wat, 
-    #     u, 
-    #     v, 
-    #     time_window, 
-    #     ridge_size,
-    #     parallel=True
-    #     )
+    rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm  = process_bounds(
+        rsize, 
+        labels, 
+        wat, 
+        u, 
+        v, 
+        time_window, 
+        ridge_size,
+        parallel=True
+        )
     
     
-    # end = time.time()
-    # print(f'  {(end - start):5.3f} s')  
+    end = time.time()
+    print(f'  {(end - start):5.3f} s')  
 
     # .........................................................................   
 
@@ -281,9 +281,9 @@ def process(
         'u' : u, 
         'v' : v, 
         'vector_field' : vector_field,
-        # 'bound_labels' : bound_labels,
-        # 'bound_norm' : bound_norm,
-        # 'bound_edm' : bound_edm
+        'bound_labels' : bound_labels,
+        'bound_norm' : bound_norm,
+        'bound_edm' : bound_edm
         }
     
     # ......................................................................... 
