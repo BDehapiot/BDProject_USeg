@@ -821,65 +821,65 @@ def process_bounds(
 
 #%%
 
-import time
-from skimage import io
+# import time
+# from skimage import io
 
-# Path
-ROOT_PATH = '../data/'
-RAW_NAME = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif"
+# # Path
+# ROOT_PATH = '../data/'
+# RAW_NAME = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif"
 
-RSIZE_NAME = RAW_NAME[0:-4] + '_rsize.tif'
-LABELS_NAME = RAW_NAME[0:-4] + '_labels.tif'
-WAT_NAME = RAW_NAME[0:-4] + '_wat.tif'
-U_NAME = RAW_NAME[0:-4] + '_u.tif'
-V_NAME = RAW_NAME[0:-4] + '_v.tif'
-BOUND_LABELS_NAME = RAW_NAME[0:-4] + '_bound_labels.tif'
-BOUND_NORM_NAME = RAW_NAME[0:-4] + '_bound_norm.tif'
-BOUND_EDM_NAME = RAW_NAME[0:-4] + '_bound_edm.tif'
+# RSIZE_NAME = RAW_NAME[0:-4] + '_rsize.tif'
+# LABELS_NAME = RAW_NAME[0:-4] + '_labels.tif'
+# WAT_NAME = RAW_NAME[0:-4] + '_wat.tif'
+# U_NAME = RAW_NAME[0:-4] + '_u.tif'
+# V_NAME = RAW_NAME[0:-4] + '_v.tif'
+# BOUND_LABELS_NAME = RAW_NAME[0:-4] + '_bound_labels.tif'
+# BOUND_NORM_NAME = RAW_NAME[0:-4] + '_bound_norm.tif'
+# BOUND_EDM_NAME = RAW_NAME[0:-4] + '_bound_edm.tif'
 
-# Open data
-rsize = io.imread(ROOT_PATH + RSIZE_NAME)
-labels = io.imread(ROOT_PATH + LABELS_NAME)
-wat = io.imread(ROOT_PATH + WAT_NAME)
-u = io.imread(ROOT_PATH + U_NAME)
-v = io.imread(ROOT_PATH + V_NAME)
-bound_labels = io.imread(ROOT_PATH + BOUND_LABELS_NAME)
-bound_norm = io.imread(ROOT_PATH + BOUND_NORM_NAME)
-bound_edm = io.imread(ROOT_PATH + BOUND_EDM_NAME)
-
-# .............................................................................
-
-''' 2) General options '''
-RSIZE_FACTOR = 0.5 # must be >= 1
-TIME_WINDOW = 3 # must be odd (must be >= 3 if PIV)
-
-''' 3) Preprocess '''
-RIDGE_SIZE = 'auto' 
-RIDGE_SIZE_COEFF = 0.75
-
-''' 4) Watershed '''
-THRESH_COEFF = 0.5 
-THRESH_MIN_SIZE = int(3000*RSIZE_FACTOR)  
-
-''' 5) PIV '''
-PIV = True 
-PIV_WIN_SIZE = int(96*RSIZE_FACTOR)
+# # Open data
+# rsize = io.imread(ROOT_PATH + RSIZE_NAME)
+# labels = io.imread(ROOT_PATH + LABELS_NAME)
+# wat = io.imread(ROOT_PATH + WAT_NAME)
+# u = io.imread(ROOT_PATH + U_NAME)
+# v = io.imread(ROOT_PATH + V_NAME)
+# bound_labels = io.imread(ROOT_PATH + BOUND_LABELS_NAME)
+# bound_norm = io.imread(ROOT_PATH + BOUND_NORM_NAME)
+# bound_edm = io.imread(ROOT_PATH + BOUND_EDM_NAME)
 
 # .............................................................................
 
-# Get id, area and linear indexes
-bound_lin_labels = bound_labels.ravel()
-idx_sort = np.argsort(bound_lin_labels)
-bound_lin_labels_sorted = bound_lin_labels[idx_sort]
-bound_id, idx_start, bound_area = np.unique(
-    bound_lin_labels_sorted,
-    return_index=True,
-    return_counts=True
-    )
+# ''' 2) General options '''
+# RSIZE_FACTOR = 0.5 # must be >= 1
+# TIME_WINDOW = 3 # must be odd (must be >= 3 if PIV)
 
-Bound_lin_idx = np.split(idx_sort, idx_start[1:]) 
-bound_idx = ([np.unravel_index(lin_idx, bound_labels.shape)
-                      for lin_idx in Bound_lin_idx])
+# ''' 3) Preprocess '''
+# RIDGE_SIZE = 'auto' 
+# RIDGE_SIZE_COEFF = 0.75
+
+# ''' 4) Watershed '''
+# THRESH_COEFF = 0.5 
+# THRESH_MIN_SIZE = int(3000*RSIZE_FACTOR)  
+
+# ''' 5) PIV '''
+# PIV = True 
+# PIV_WIN_SIZE = int(96*RSIZE_FACTOR)
+
+# .............................................................................
+
+# # Get id, area and linear indexes
+# bound_lin_labels = bound_labels.ravel()
+# idx_sort = np.argsort(bound_lin_labels)
+# bound_lin_labels_sorted = bound_lin_labels[idx_sort]
+# bound_id, idx_start, bound_area = np.unique(
+#     bound_lin_labels_sorted,
+#     return_index=True,
+#     return_counts=True
+#     )
+
+# Bound_lin_idx = np.split(idx_sort, idx_start[1:]) 
+# bound_idx = ([np.unravel_index(lin_idx, bound_labels.shape)
+#                       for lin_idx in Bound_lin_idx])
 
 # .............................................................................
 

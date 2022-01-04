@@ -6,7 +6,7 @@ import numpy as np
 
 #%%
 
-from useg.core_temp import preprocess, watseg, process_bounds
+from useg.core import preprocess, watseg, process_bounds
 from useg.tools.piv import bd_openpiv
 
 #%% preview

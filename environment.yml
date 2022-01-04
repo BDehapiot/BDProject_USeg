@@ -1,4 +1,4 @@
-name: useg
+name: USeg
 
 channels:
     - conda-forge
@@ -13,3 +13,4 @@ dependencies:
     - matplotlib-base
     - joblib
     - openpiv
+    - napari
