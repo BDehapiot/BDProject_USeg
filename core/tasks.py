@@ -6,8 +6,8 @@ import numpy as np
 
 #%%
 
-from useg.functions import preprocess, watseg, process_bounds
-from useg.tools.piv import bd_openpiv
+from core.functions import preprocess, watseg, process_bounds
+from core.tools.piv import bd_openpiv
 
 #%% preview
 

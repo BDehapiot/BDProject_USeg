@@ -5,7 +5,7 @@ import numpy as np
 
 #%%
 
-from .idx import bd_where
+from core.tools.idx import bd_where
 
 #%% bd_nanfilt
 

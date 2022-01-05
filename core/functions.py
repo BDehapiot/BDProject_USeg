@@ -15,8 +15,8 @@ from skimage.morphology import remove_small_objects, label, binary_dilation, rem
 
 #%%
 
-from useg.tools.conn import bd_labconn
-from useg.tools.nan import bd_nanreplace
+from core.tools.conn import bd_labconn
+from core.tools.nan import bd_nanreplace
 
 #%% Best ridge size
 
@@ -485,7 +485,7 @@ def _process_bounds_preprocess(rsize, labels, wat, ridge_size):
     # Get temp_mask
     temp_mask = labels > 0
     temp_mask = binary_dilation(
-        temp_mask, selem = disk(ridge_size)
+        temp_mask, footprint=disk(ridge_size)
         )
     
     # Get bg_blur (with a nan ignoring Gaussian blur)
@@ -819,31 +819,31 @@ def process_bounds(
 
 #%%
 
-import time
-from skimage import io
+# import time
+# from skimage import io
 
-# Path
-ROOT_PATH = 'data/'
-RAW_NAME = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif"
+# # Path
+# ROOT_PATH = 'data/'
+# RAW_NAME = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif"
 
-RSIZE_NAME = RAW_NAME[0:-4] + '_rsize.tif'
-LABELS_NAME = RAW_NAME[0:-4] + '_labels.tif'
-WAT_NAME = RAW_NAME[0:-4] + '_wat.tif'
-U_NAME = RAW_NAME[0:-4] + '_u.tif'
-V_NAME = RAW_NAME[0:-4] + '_v.tif'
-BOUND_LABELS_NAME = RAW_NAME[0:-4] + '_bound_labels.tif'
-BOUND_NORM_NAME = RAW_NAME[0:-4] + '_bound_norm.tif'
-BOUND_EDM_NAME = RAW_NAME[0:-4] + '_bound_edm.tif'
+# RSIZE_NAME = RAW_NAME[0:-4] + '_rsize.tif'
+# LABELS_NAME = RAW_NAME[0:-4] + '_labels.tif'
+# WAT_NAME = RAW_NAME[0:-4] + '_wat.tif'
+# U_NAME = RAW_NAME[0:-4] + '_u.tif'
+# V_NAME = RAW_NAME[0:-4] + '_v.tif'
+# BOUND_LABELS_NAME = RAW_NAME[0:-4] + '_bound_labels.tif'
+# BOUND_NORM_NAME = RAW_NAME[0:-4] + '_bound_norm.tif'
+# BOUND_EDM_NAME = RAW_NAME[0:-4] + '_bound_edm.tif'
 
-# Open data
-rsize = io.imread(ROOT_PATH + RSIZE_NAME)
-labels = io.imread(ROOT_PATH + LABELS_NAME)
-wat = io.imread(ROOT_PATH + WAT_NAME)
-u = io.imread(ROOT_PATH + U_NAME)
-v = io.imread(ROOT_PATH + V_NAME)
-bound_labels = io.imread(ROOT_PATH + BOUND_LABELS_NAME)
-bound_norm = io.imread(ROOT_PATH + BOUND_NORM_NAME)
-bound_edm = io.imread(ROOT_PATH + BOUND_EDM_NAME)
+# # Open data
+# rsize = io.imread(ROOT_PATH + RSIZE_NAME)
+# labels = io.imread(ROOT_PATH + LABELS_NAME)
+# wat = io.imread(ROOT_PATH + WAT_NAME)
+# u = io.imread(ROOT_PATH + U_NAME)
+# v = io.imread(ROOT_PATH + V_NAME)
+# bound_labels = io.imread(ROOT_PATH + BOUND_LABELS_NAME)
+# bound_norm = io.imread(ROOT_PATH + BOUND_NORM_NAME)
+# bound_edm = io.imread(ROOT_PATH + BOUND_EDM_NAME)
 
 # .............................................................................
 

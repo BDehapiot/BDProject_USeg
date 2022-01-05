@@ -6,7 +6,7 @@ from skimage.morphology import label
 
 #%%
 
-from useg.tools.idx import bd_where
+from core.tools.idx import bd_where
 
 #%% bd_pixconn
 

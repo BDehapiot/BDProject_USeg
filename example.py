@@ -6,8 +6,8 @@ from skimage import io
 
 #%%
 
-from useg.functions import best_ridge_size
-from useg.tasks import process
+from core.functions import best_ridge_size
+from core.tasks import process
 
 #%% Parameters
 
