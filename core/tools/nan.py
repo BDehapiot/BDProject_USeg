@@ -5,11 +5,11 @@ import numpy as np
 
 #%%
 
-from core.tools.idx import bd_where
+from tools.idx import rwhere
 
-#%% bd_nanfilt
+#%% nanfilt
 
-def bd_nanfilt(img, kernel_size, method):
+def nanfilt(img, kernel_size, method):
 
     """General description.
 
@@ -55,7 +55,7 @@ def bd_nanfilt(img, kernel_size, method):
     )
 
     # Find non-NaNs coordinates
-    idx = bd_where(~np.isnan(img), True)
+    idx = rwhere(~np.isnan(img), True)
     idx_t = idx[0].squeeze().astype("int")
     idx_y = idx[1].squeeze().astype("int")
     idx_x = idx[2].squeeze().astype("int")
@@ -94,9 +94,9 @@ def bd_nanfilt(img, kernel_size, method):
     return img_nanfilt
 
 
-#%% bd_nanreplace
+#%% nanreplace
 
-def bd_nanreplace(img, kernel_size, method, mask=None):
+def nanreplace(img, kernel_size, method, mask=None):
 
     """General description.
 
@@ -146,9 +146,9 @@ def bd_nanreplace(img, kernel_size, method, mask=None):
 
     # Find NaNs coordinates
     if mask is None:
-        idx = bd_where(np.isnan(img), True)
+        idx = rwhere(np.isnan(img), True)
     else:
-        idx = bd_where(np.isnan(img) & (mask > 0), True)
+        idx = rwhere(np.isnan(img) & (mask > 0), True)
     idx_t = idx[0].squeeze().astype("int")
     idx_y = idx[1].squeeze().astype("int")
     idx_x = idx[2].squeeze().astype("int")
@@ -187,9 +187,9 @@ def bd_nanreplace(img, kernel_size, method, mask=None):
     return img_nanreplace
 
 
-#%% bd_nanoutliers
+#%% nanoutliers
 
-def bd_nanoutliers(img, kernel_size, method, sd_thresh=1.5):
+def nanoutliers(img, kernel_size, method, sd_thresh=1.5):
 
     """General description.
 
@@ -230,7 +230,7 @@ def bd_nanoutliers(img, kernel_size, method, sd_thresh=1.5):
 
     # nanfilt_2D
     pad = (kernel_size - 1) // 2
-    img_filt = bd_nanfilt(img, kernel_size=kernel_size, method=method)
+    img_filt = nanfilt(img, kernel_size=kernel_size, method=method)
 
     # Detect outliers
     residuals = img - img_filt
@@ -252,7 +252,7 @@ def bd_nanoutliers(img, kernel_size, method, sd_thresh=1.5):
     )
 
     # Find outliers coordinates
-    idx = bd_where(outliers, 1)
+    idx = rwhere(outliers, 1)
     idx_t = idx[0].squeeze().astype("int")
     idx_y = idx[1].squeeze().astype("int")
     idx_x = idx[2].squeeze().astype("int")
@@ -288,64 +288,3 @@ def bd_nanoutliers(img, kernel_size, method, sd_thresh=1.5):
         img_nanoutliers = img_nanoutliers.squeeze()
 
     return img_nanoutliers
-
-#%% Standalone exe
-
-# import time
-# from skimage import io
-
-# # Path
-# ROOT_PATH = 'C:/Datas/3-GitHub_BDehapiot/BD_USeg/data/'
-# U_NAME = '13-12-06_40x_GBE_Ctrl_#19_Lite_uint8_u.tif'
-# MASK_NAME = '13-12-06_40x_GBE_Ctrl_#19_Lite_uint8_u_mask.tif'
-
-# # Parameters
-# kernel_size = 7
-# method = 'mean'
-# sd_thresh = 1.5
-
-# # Open data
-# img = io.imread(ROOT_PATH + U_NAME)
-# mask = io.imread(ROOT_PATH + MASK_NAME)
-
-# # Get stack dimension
-# nT = img.shape[0]
-# nY = img.shape[1]
-# nX = img.shape[2]
-
-# ttest = 74
-# img_test = img[ttest]
-# mask_test = mask[ttest]
-
-# start = time.time()
-# print("Run time")
-
-# img_filt = bd_nanoutliers(img_test, kernel_size, method, sd_thresh)
-# img_filt = bd_nanreplace(img_filt, kernel_size, method, mask_test)
-# img_filt = bd_nanfilt(img_filt, kernel_size, method)
-
-# img_nanfilt = bd_nanfilt(img, kernel_size, method)
-# img_nanreplace = bd_nanreplace(img, kernel_size, method, mask)
-# img_nanoutliers = bd_nanoutliers(img, kernel_size, method, sd_thresh)
-
-# end = time.time()
-# print(f"  {(end - start):5.3f} s")
-
-# io.imsave(ROOT_PATH+U_NAME[0:-4]+'_nanfilt.tif', img_nanfilt.astype("float32"), check_contrast=False)
-# io.imsave(ROOT_PATH+U_NAME[0:-4]+'_nanreplace.tif', img_nanreplace.astype("float32"), check_contrast=False)
-# io.imsave(ROOT_PATH+U_NAME[0:-4]+'_nanoutliers.tif', img_nanoutliers.astype("float32"), check_contrast=False)
-
-
-#%% Plot results
-# import matplotlib.pyplot as plt
-
-# f, axes = plt.subplots(4, 1, figsize=(22, 22))
-# axes[0].imshow(raw, cmap='gray')
-# axes[1].imshow(raw_filt, cmap='gray')
-# axes[2].imshow(outliers, cmap='gray')
-# axes[3].imshow(raw_outfilt, cmap='gray')
-# axes[0].title.set_text('raw')
-# axes[1].title.set_text('raw_filt')
-# axes[2].title.set_text('outliers')
-# axes[3].title.set_text('raw_outfilt')
-# plt.show()

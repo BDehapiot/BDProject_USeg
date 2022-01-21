@@ -4,7 +4,7 @@ import numpy as np
 
 #%% bd_uint8
 
-def bd_uint8(img, int_range=0.99):
+def as_uint8(img, int_range=0.99):
 
     ''' General description.
     

@@ -6,11 +6,11 @@ from skimage.morphology import label
 
 #%%
 
-from core.tools.idx import bd_where
+from tools.idx import rwhere
 
-#%% bd_pixconn
+#%% pixconn
 
-def bd_pixconn(img, conn=2):
+def pixconn(img, conn=2):
     
     conn1_selem = np.array([[0, 1, 0],
                             [1, 0, 1],
@@ -34,7 +34,7 @@ def bd_pixconn(img, conn=2):
                       mode='constant', constant_values=0)   
     
     # Find wat non-zero coordinates
-    idx = bd_where(img > 0, True) 
+    idx = rwhere(img > 0, True) 
     idx_t = idx[0].squeeze().astype('int')
     idx_y = idx[1].squeeze().astype('int')
     idx_x = idx[2].squeeze().astype('int')
@@ -67,9 +67,9 @@ def bd_pixconn(img, conn=2):
 
     return img_pixconn
 
-#%% bd_labconn
+#%% labconn
 
-def bd_labconn(img, labels=None, conn=2):
+def labconn(img, labels=None, conn=2):
     
     conn1_selem = np.array([[0, 1, 0],
                             [1, 1, 1],
@@ -105,7 +105,7 @@ def bd_labconn(img, labels=None, conn=2):
                       mode='constant', constant_values=np.nan)
                   
     # Find wat non-zero coordinates
-    idx = bd_where(img > 0, True) 
+    idx = rwhere(img > 0, True) 
     idx_t = idx[0].squeeze().astype('int')
     idx_y = idx[1].squeeze().astype('int')
     idx_x = idx[2].squeeze().astype('int')
@@ -143,46 +143,3 @@ def bd_labconn(img, labels=None, conn=2):
         img_labconn = img_labconn.squeeze()
         
     return img_labconn
-
-#%% Standalone exe
-
-# import time
-# from skimage import io
-
-# # Path
-# ROOT_PATH = 'C:/Datas/3-GitHub_BDehapiot/BD_useg/data/'
-# # ROOT_PATH = 'E:/3-GitHub_BDehapiot/BD_useg/data/'
-# RAW_NAME = '18-07-11_40x_GBE_Ctrl_b1_Lite_uint8.tif'
-
-# WAT_NAME = '18-07-11_40x_GBE_Ctrl_b1_Lite_uint8_wat.tif'
-# LABELS_NAME = '18-07-11_40x_GBE_Ctrl_b1_Lite_uint8_labels.tif'
-
-# # Open data
-# wat = io.imread(ROOT_PATH + WAT_NAME)
-# labels = io.imread(ROOT_PATH + LABELS_NAME)
-
-# ''' ------------------------------------------------------------------------''' 
-
-# start = time.time()
-# print("bd_pixconn")
-
-# wat_pixconn = bd_pixconn(wat, conn=2)
-
-# end = time.time()
-# print(f"  {(end - start):5.3f} s")
-
-# io.imsave(ROOT_PATH+RAW_NAME[0:-4]+'_wat_pixconn.tif', wat_pixconn.astype("uint8"), check_contrast=False) 
-
-# ''' ------------------------------------------------------------------------''' 
-
-# start = time.time()
-# print("bd_labconn")
-
-# wat_labconn = bd_labconn(wat, labels=labels, conn=2)
-
-# end = time.time()
-# print(f"  {(end - start):5.3f} s")
-
-# io.imsave(ROOT_PATH+RAW_NAME[0:-4]+'_wat_labconn.tif', wat_labconn.astype("uint8"), check_contrast=False) 
-
-# ''' ------------------------------------------------------------------------''' 

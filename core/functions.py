@@ -15,8 +15,8 @@ from skimage.morphology import remove_small_objects, label, binary_dilation, rem
 
 #%%
 
-from core.tools.conn import bd_labconn
-from core.tools.nan import bd_nanreplace
+from tools.conn import labconn
+from tools.nan import nanreplace
 
 #%% Best ridge size
 
@@ -387,7 +387,7 @@ def _process_bounds_label(labels, wat):
     '''
 
     # Get vertices
-    vertices = bd_labconn(wat, labels=labels, conn=2) > 2
+    vertices = labconn(wat, labels=labels, conn=2) > 2
     
     # Get bounds & endpoints
     bounds = wat.copy()
@@ -397,7 +397,7 @@ def _process_bounds_label(labels, wat):
     # Label bounds
     bounds_labels = label(bounds, connectivity=2).astype('float')
     bounds_labels[endpoints == 1] = np.nan
-    bounds_labels = bd_nanreplace(bounds_labels, 3, 'max')
+    bounds_labels = nanreplace(bounds_labels, 3, 'max')
     bounds_labels = bounds_labels.astype('int')
     
     # Label small bounds 
@@ -515,8 +515,7 @@ def _process_bounds_preprocess(rsize, labels, wat, ridge_size):
 
 ''' ........................................................................'''
 
-def _process_bounds_filt(
-        wat,
+def _process_bounds_extract(
         u, v,
         bound_labels, 
         bound_norm, 
@@ -571,7 +570,8 @@ def _process_bounds_filt(
     
     # Initialize
     bound_data = []
-    time_point = time_idx - time_window
+    time_0 = time_window//2
+    time_point = time_idx - time_0
         
     # Get id, area and linear indexes
     temp_bound_labels = bound_labels.ravel()
@@ -598,29 +598,28 @@ def _process_bounds_filt(
                           bound_idx[1].squeeze().mean())
 
             if time_window > 1:
-            
-                if u is not None:
 
-                    # Extract local PIV info 
-                    d_u = u[round(bound_ctrd[0]), round(bound_ctrd[1])]
-                    d_v = v[round(bound_ctrd[0]), round(bound_ctrd[1])]
-                                                                                   
-                    if np.isnan(d_u):
-                        
-                        d_u = 0; d_v = 0  
-                                            
+                # Extract local PIV info 
+                d_u = u[round(bound_ctrd[0]), round(bound_ctrd[1])]
+                d_v = v[round(bound_ctrd[0]), round(bound_ctrd[1])]
+                                                                               
+                if np.isnan(d_u):
+                    
+                    d_u = 0; d_v = 0  
+                                                                    
                 # Get 2D indexes
                 idx_y = bound_idx[0].squeeze().astype('int')
                 idx_x = bound_idx[1].squeeze().astype('int') 
                 
                 # Correct PIV according to t_point
                 piv_correct = time_range[
-                    time_idx-time_window:time_idx+time_window+1] - time_point
+                    time_idx-time_0:time_idx+time_0+1] - time_point
                 d_u_cor = round(d_u) * piv_correct 
                 d_v_cor = round(d_v) * piv_correct 
                    
                 # Get bound_edm_range
-                bound_edm_range = np.zeros(bound_edm.shape[0])
+                bound_edm_range_int = np.zeros(bound_edm.shape[0])
+                bound_edm_range_sd = np.zeros(bound_edm.shape[0])
                 for k in range(bound_edm.shape[0]):
 
                     # Get PIV corrected idx
@@ -634,15 +633,17 @@ def _process_bounds_filt(
                     idx_y_cor = idx_y_cor[idx_valid == True]
                     idx_x_cor = idx_x_cor[idx_valid == True]
                 
-                    # Measure 
-                    bound_edm_range[k] = np.mean(
+                    # Get edm_range int & sd   
+                    bound_edm_range_int[k] = np.mean(
                         bound_edm[k, idx_y_cor, idx_x_cor])
+                    bound_edm_range_sd[k] = np.std(
+                        bound_edm[k, idx_y_cor, idx_x_cor])                    
                 
-                # Get wat_edm_int (avg of wat_edm_range excluding t0)               
-                bound_edm_t0 = bound_edm_range[time_window]
-                bound_edm_range[time_window] = np.nan
-                bound_edm_int = np.nanmean(bound_edm_range)
-                bound_edm_sd = np.nanstd(bound_edm_range)
+                # Get edm_int & sd (avg. of edm_range excluding t0)               
+                bound_edm_range_int[time_0] = np.nan
+                bound_edm_range_sd[time_0] = np.nan
+                bound_edm_int = np.nanmean(bound_edm_range_int)
+                bound_edm_sd = np.nanmean(bound_edm_range_sd)
                                 
             else:
                 
@@ -713,7 +714,7 @@ def process_bounds(
         wat = wat.reshape((1, wat.shape[0], wat.shape[1]))
         
     # Get time_info    
-    time_0 = time_window // 2
+    time_0 = time_window//2
     time_end = rsize.shape[0] + (time_0-1) 
     time_range = np.arange(0, rsize.shape[0]) 
     
@@ -795,16 +796,38 @@ def process_bounds(
     
 # _process_bounds_extract .....................................................
 
-    # Get id, area and linear indexes
-    temp_bound_labels = bound_labels.ravel()
-    idx_sort = np.argsort(temp_bound_labels)
-    temp_bound_labels_sorted = temp_bound_labels[idx_sort]
-    all_id, idx_start, all_area = np.unique(
-        temp_bound_labels_sorted,
-        return_index=True,
-        return_counts=True
-        )
-    lin_idx = np.split(idx_sort, idx_start[1:]) 
+    if parallel:
+        
+        output_list = Parallel(n_jobs=-1)(
+            delayed(_process_bounds_extract)(
+                u[i,...], v[i,...],
+                bound_labels[i,...],
+                bound_norm[i,...],
+                bound_edm[i-time_0:i+time_0,...],
+                time_window,
+                time_range,
+                i
+                )
+            for i in range(time_0, time_end+1)
+            ) 
+                       
+    else:
+        
+        output_list = [_process_bounds_extract(
+                u[i,...], v[i,...],
+                bound_labels[i,...],
+                bound_norm[i,...],
+                bound_edm[i-time_0:i+time_0,...],
+                time_window,
+                time_range,
+                i
+                )
+            for i in range(time_0, time_end+1)
+            ]
+        
+    # Extract output
+    bound_data = []
+    bound_data = bound_data + [arrays for arrays in output_list]
 
 # Terminate ...................................................................
     
@@ -814,8 +837,12 @@ def process_bounds(
         labels = labels.squeeze()
         wat = wat.squeeze()
         bound_labels = bound_labels.squeeze()
+        bound_norm = bound_labels.squeeze()
+        bound_edm = bound_edm.squeeze()
+        
+    #     
 
-    return rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm
+    return rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm, bound_data
 
 #%%
 
@@ -823,7 +850,7 @@ def process_bounds(
 # from skimage import io
 
 # # Path
-# ROOT_PATH = 'data/'
+# ROOT_PATH = '../data/temp/'
 # RAW_NAME = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif"
 
 # RSIZE_NAME = RAW_NAME[0:-4] + '_rsize.tif'
@@ -865,32 +892,7 @@ def process_bounds(
 
 # .............................................................................
 
-# # Get id, area and linear indexes
-# bound_lin_labels = bound_labels.ravel()
-# idx_sort = np.argsort(bound_lin_labels)
-# bound_lin_labels_sorted = bound_lin_labels[idx_sort]
-# bound_id, idx_start, bound_area = np.unique(
-#     bound_lin_labels_sorted,
-#     return_index=True,
-#     return_counts=True
-#     )
-
-# Bound_lin_idx = np.split(idx_sort, idx_start[1:]) 
-# bound_idx = ([np.unravel_index(lin_idx, bound_labels.shape)
-#                       for lin_idx in Bound_lin_idx])
-
 # .............................................................................
 
-# bound_int = bound_norm.ravel().take(idx_sort)
-# lin_int = np.split(bound_int, idx_start[1:]) 
-
-# # test = np.array(list(map(np.mean, lin_int)))
-
-# test = np.array([ints.mean() for ints in lin_int])
-
-#             bound_idx = np.unravel_index(lin_idx[j], bound_labels.shape)             
-#             bound_area = all_area[j].astype('int')
-#             bound_int = np.mean(bound_norm[bound_idx])
-#             bound_ctrd = (bound_idx[0].squeeze().mean(),
-#                           bound_idx[1].squeeze().mean())
+# .............................................................................
 

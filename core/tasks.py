@@ -1,13 +1,12 @@
 #%%
 
 import time
-import napari
 import numpy as np
 
 #%%
 
-from core.functions import preprocess, watseg, process_bounds
-from core.tools.piv import bd_openpiv
+from functions import preprocess, watseg, process_bounds
+from tools.piv import bd_openpiv
 
 #%% preview
 
@@ -196,6 +195,8 @@ def process(
     
     '''
     
+    # .........................................................................
+    
     start = time.time()
     print('Preprocess')
         
@@ -244,26 +245,24 @@ def process(
         
     else:
         
-        u = []
-        v = []
-        vector_field = []
+        u = np.zeros(rsize.shape)
+        v = np.zeros(rsize.shape)
+        vector_field = np.zeros(rsize.shape)
     
     # .........................................................................  
 
     start = time.time()
     print('Process bounds')
 
-    rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm  = process_bounds(
+    rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm, bound_data = process_bounds(
         rsize, 
         labels, 
         wat, 
-        u, 
-        v, 
+        u, v, 
         time_window, 
         ridge_size,
         parallel=True
         )
-    
     
     end = time.time()
     print(f'  {(end - start):5.3f} s')  
@@ -278,12 +277,12 @@ def process(
         'markers' : markers,
         'labels' : labels,
         'wat' : wat,
-        'u' : u, 
-        'v' : v, 
+        'u' : u, 'v' : v, 
         'vector_field' : vector_field,
         'bound_labels' : bound_labels,
         'bound_norm' : bound_norm,
-        'bound_edm' : bound_edm
+        'bound_edm' : bound_edm,
+        'bound_data' : bound_data
         }
     
     # ......................................................................... 

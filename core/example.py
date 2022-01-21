@@ -3,17 +3,16 @@
 import time
 from skimage import io
 
-
 #%%
 
-from core.functions import best_ridge_size
-from core.tasks import process
+from functions import best_ridge_size
+from tasks import process
 
 #%% Parameters
 
 ''' 1) Open data '''
 
-ROOT_PATH = 'data/'
+ROOT_PATH = '../data/'
 
 # RAW_NAME = '13-12-06_40x_GBE_eCad_Ctrl_#19_Lite_uint8.tif'
 RAW_NAME = '13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif'

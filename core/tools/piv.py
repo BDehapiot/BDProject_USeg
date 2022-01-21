@@ -13,7 +13,7 @@ from skimage.transform import resize
 
 #%%
 
-from core.tools.nan import bd_nanfilt, bd_nanoutliers, bd_nanreplace
+from tools.nan import nanfilt, nanoutliers, nanreplace
 
 #%% bd_openpiv
 
@@ -162,13 +162,13 @@ def _bd_openpiv_filt(u, v, mask, smooth_size, smooth_method):
         v[mask==False] = np.nan
     
     # Filt vector field   
-    u = bd_nanoutliers(u, smooth_size, smooth_method, sd_thresh=1.5)
-    u = bd_nanreplace(u, smooth_size, smooth_method, mask)
-    u = bd_nanfilt(u, smooth_size, smooth_method)
+    u = nanoutliers(u, smooth_size, smooth_method, sd_thresh=1.5)
+    u = nanreplace(u, smooth_size, smooth_method, mask)
+    u = nanfilt(u, smooth_size, smooth_method)
 
-    v = bd_nanoutliers(v, smooth_size, smooth_method, sd_thresh=1.5)
-    v = bd_nanreplace(v, smooth_size, smooth_method, mask)
-    v = bd_nanfilt(v, smooth_size, smooth_method)
+    v = nanoutliers(v, smooth_size, smooth_method, sd_thresh=1.5)
+    v = nanreplace(v, smooth_size, smooth_method, mask)
+    v = nanfilt(v, smooth_size, smooth_method)
 
     return u, v
 
@@ -475,67 +475,3 @@ def bd_openpiv(
     else:
         
         return u, v
-
-#%% Standalone exe
-
-# import time
-# from skimage import io
-
-# # Path
-# ROOT_PATH = '../../data/'
-# RAW_NAME = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif"
-
-# RSIZE_NAME = RAW_NAME[0:-4] + '_rsize.tif'
-# LABELS_NAME = RAW_NAME[0:-4] + '_labels.tif'
-
-# # Open data
-# rsize = io.imread(ROOT_PATH + RSIZE_NAME)
-# labels = io.imread(ROOT_PATH + LABELS_NAME)
-
-# # # .............................................................................
-
-# ''' 2) General options '''
-# RSIZE_FACTOR = 0.5 # must be >= 1
-# TIME_WINDOW = 3 # must be odd (must be >= 3 if PIV)
-
-# ''' 3) Preprocess '''
-# RIDGE_SIZE = 'auto' 
-# RIDGE_SIZE_COEFF = 0.75
-
-# ''' 4) Watershed '''
-# THRESH_COEFF = 0.5 
-# THRESH_MIN_SIZE = int(3000*RSIZE_FACTOR)  
-
-# ''' 5) PIV '''
-# PIV = True 
-# PIV_WIN_SIZE = int(96*RSIZE_FACTOR)
-
-# # # .............................................................................
-
-# if PIV:
-
-#     start = time.time()
-#     print('PIV')
-
-#     # Create piv_mask
-#     piv_mask = labels > 0
-
-#     u, v, vector_field = bd_openpiv(
-#         rsize,
-#         TIME_WINDOW, 
-#         PIV_WIN_SIZE, 
-#         mask=piv_mask,
-#         smooth_size=3,
-#         smooth_method='median',
-#         missing_frames='nearest', 
-#         bsize=True,
-#         display=True,
-#         parallel=True
-#         )
-        
-#     end = time.time()
-#     print(f'  {(end - start):5.3f} s')
-
-# io.imsave(ROOT_PATH+RAW_NAME[0:-4]+'_u.tif', u.astype("float32"), check_contrast=False) 
-# io.imsave(ROOT_PATH+RAW_NAME[0:-4]+'_v.tif', v.astype("float32"), check_contrast=False)
-# io.imsave(ROOT_PATH+RAW_NAME[0:-4]+'_display.tif', display.astype("uint8"), check_contrast=False)

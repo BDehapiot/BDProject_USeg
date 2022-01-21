@@ -2,9 +2,9 @@
 
 import numpy as np
 
-#%% bd_where
+#%% rwhere
 
-def bd_where(img, val):
+def rwhere(img, val):
     
     ''' General description.
     
