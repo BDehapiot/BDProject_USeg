@@ -5,8 +5,8 @@ import numpy as np
 
 #%%
 
-from functions import preprocess, watseg, process_bounds
 from tools.piv import bd_openpiv
+from functions import preprocess, watseg, process_bounds, display_bounds
 
 #%% preview
 
@@ -268,6 +268,20 @@ def process(
     print(f'  {(end - start):5.3f} s')  
 
     # .........................................................................   
+    
+    start = time.time()
+    print('Display bounds')
+    
+    bound_int_display, bound_edm_int_display, bound_edm_sd_display = display_bounds(
+        bound_data, 
+        bound_norm, 
+        bound_edm
+        )  
+
+    end = time.time()
+    print(f'  {(end - start):5.3f} s')      
+    
+    # .........................................................................   
 
     # Extract outputs in a dictionnary
     outputs = {
@@ -287,4 +301,4 @@ def process(
     
     # ......................................................................... 
 
-    return outputs     
+    return outputs, bound_int_display, bound_edm_int_display, bound_edm_sd_display

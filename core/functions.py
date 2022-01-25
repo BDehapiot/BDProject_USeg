@@ -362,7 +362,7 @@ def watseg(ridges, thresh_coeff, thresh_min_size, parallel=True):
     
     return mask, markers, labels, wat
 
-#%% process_bounds 
+#%% Process bounds
 
 def _process_bounds_label(labels, wat):
     
@@ -528,10 +528,7 @@ def _process_bounds_extract(
     ''' General description.
     
     Parameters
-    ----------        
-    wat : np.ndarray (bool)
-        Description.
-        
+    ----------                
     u : np.ndarray (float) 
         Description.
 
@@ -572,7 +569,7 @@ def _process_bounds_extract(
     bound_data = []
     time_0 = time_window//2
     time_point = time_idx - time_0
-        
+            
     # Get id, area and linear indexes
     temp_bound_labels = bound_labels.ravel()
     idx_sort = np.argsort(temp_bound_labels)
@@ -650,7 +647,7 @@ def _process_bounds_extract(
                 bound_edm_int = 1
                 bound_edm_sd = 0
                 d_u = 0; d_v = 0  
-                     
+        
             # Append bound_data 
             temp_data = {
                 'time_point' : time_point,
@@ -658,9 +655,9 @@ def _process_bounds_extract(
                 'area' : bound_area,
                 'ctrd' : bound_ctrd,
                 'idx' : bound_idx,
-                'bound_int' : bound_int,
+                'bound_int' : bound_int,     
                 'bound_edm_int' : bound_edm_int, 
-                'bound_edm_sd' : bound_edm_sd, 
+                'bound_edm_sd' : bound_edm_sd,             
                 'd_u' : d_u,
                 'd_v' : d_v
                 }
@@ -715,7 +712,7 @@ def process_bounds(
         
     # Get time_info    
     time_0 = time_window//2
-    time_end = rsize.shape[0] + (time_0-1) 
+    time_end = rsize.shape[0] + time_0 
     time_range = np.arange(0, rsize.shape[0]) 
     
 # _process_bounds_extend_time .................................................    
@@ -808,7 +805,7 @@ def process_bounds(
                 time_range,
                 i
                 )
-            for i in range(time_0, time_end+1)
+            for i in range(time_0, time_end)
             ) 
                        
     else:
@@ -822,7 +819,7 @@ def process_bounds(
                 time_range,
                 i
                 )
-            for i in range(time_0, time_end+1)
+            for i in range(time_0, time_end)
             ]
         
     # Extract output
@@ -840,9 +837,73 @@ def process_bounds(
         bound_norm = bound_labels.squeeze()
         bound_edm = bound_edm.squeeze()
         
-    #     
+    # Revert extend time
+    if time_window > 1:       
+        rsize = rsize[time_0:time_end,...]
+        labels = labels[time_0:time_end,...]
+        wat = wat[time_0:time_end,...]
+        u = u[time_0:time_end,...]
+        v = v[time_0:time_end,...]
+        bound_labels = bound_labels[time_0:time_end,...]
+        bound_norm = bound_norm[time_0:time_end,...]
+        bound_edm = bound_edm[time_0:time_end,...]
+        
+    return rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm, bound_data   
 
-    return rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm, bound_data
+#%% Make displays
+
+def _display_bounds(bound_data, bound_norm, bound_edm): 
+    
+    bound_int_display = np.zeros(bound_norm.shape)
+    bound_edm_int_display = np.zeros(bound_edm.shape)
+    bound_edm_sd_display = np.zeros(bound_edm.shape)
+    
+    for bound in bound_data:
+        
+        idx_y = bound['idx'][0]
+        idx_x = bound['idx'][1]
+        
+        bound_int_display[idx_y, idx_x] = bound['bound_int']
+        bound_edm_int_display[idx_y, idx_x] = bound['bound_edm_int']
+        bound_edm_sd_display[idx_y, idx_x] = bound['bound_edm_sd']
+
+    return bound_int_display, bound_edm_int_display, bound_edm_sd_display
+    
+''' ........................................................................'''
+
+def display_bounds(bound_data, bound_norm, bound_edm, parallel=True):  
+    
+# _process_bounds_preprocess ..................................................
+
+    if parallel:
+        
+        output_list = Parallel(n_jobs=-1)(
+            delayed(_display_bounds)(
+                d_frame,
+                n_frame,
+                e_frame,
+                )
+            for d_frame, n_frame, e_frame in zip(
+                    bound_data, bound_norm, bound_edm)
+            ) 
+        
+    else:
+        
+        output_list = [_display_bounds(
+                d_frame,
+                n_frame,
+                e_frame,
+                )
+            for d_frame, n_frame, e_frame in zip(
+                    bound_data, bound_norm, bound_edm)
+            ]
+        
+    # Extract output
+    bound_int_display = np.stack([arrays[0] for arrays in output_list], axis=0)
+    bound_edm_int_display = np.stack([arrays[1] for arrays in output_list], axis=0)
+    bound_edm_sd_display = np.stack([arrays[2] for arrays in output_list], axis=0)
+    
+    return bound_int_display, bound_edm_int_display, bound_edm_sd_display
 
 #%%
 

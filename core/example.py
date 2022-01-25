@@ -66,9 +66,10 @@ if TIME_WINDOW < 1 or TIME_WINDOW % 2 == 0:
 
 #%%
 
-outputs = process(raw,
+outputs, bound_int_display, bound_edm_int_display, bound_edm_sd_display = process(raw,
     RSIZE_FACTOR, TIME_WINDOW, RIDGE_SIZE, THRESH_COEFF, THRESH_MIN_SIZE,
     PIV, PIV_WIN_SIZE)
+
 
 #%% Save data
 
@@ -85,6 +86,9 @@ io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_labels.tif', outputs["bound_
 io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_norm.tif', outputs["bound_norm"].astype('float32'), check_contrast=False)
 io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_edm.tif', outputs["bound_edm"].astype('float32'), check_contrast=False)
 
+io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_int_display.tif', bound_int_display.astype('float32'), check_contrast=False)
+io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_edm_int_display.tif', bound_edm_int_display.astype('float32'), check_contrast=False)
+io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_edm_sd_display.tif', bound_edm_sd_display.astype('float32'), check_contrast=False)
 
 if PIV:
     
