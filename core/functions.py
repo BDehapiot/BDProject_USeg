@@ -590,7 +590,7 @@ def _process_bounds_extract(
             # Get bound info                        
             bound_idx = np.unravel_index(lin_idx[j], bound_labels.shape)             
             bound_area = all_area[j].astype('int')
-            bound_int = np.mean(bound_norm[bound_idx])
+            bound_norm_int = np.mean(bound_norm[bound_idx])
             bound_ctrd = (bound_idx[0].squeeze().mean(),
                           bound_idx[1].squeeze().mean())
 
@@ -655,9 +655,9 @@ def _process_bounds_extract(
                 'area' : bound_area,
                 'ctrd' : bound_ctrd,
                 'idx' : bound_idx,
-                'bound_int' : bound_int,     
-                'bound_edm_int' : bound_edm_int, 
-                'bound_edm_sd' : bound_edm_sd,             
+                'norm_int' : bound_norm_int,     
+                'edm_int' : bound_edm_int, 
+                'edm_sd' : bound_edm_sd,             
                 'd_u' : d_u,
                 'd_v' : d_v
                 }
@@ -834,7 +834,7 @@ def process_bounds(
         labels = labels.squeeze()
         wat = wat.squeeze()
         bound_labels = bound_labels.squeeze()
-        bound_norm = bound_labels.squeeze()
+        bound_norm = bound_norm.squeeze()
         bound_edm = bound_edm.squeeze()
         
     # Revert extend time
@@ -848,13 +848,17 @@ def process_bounds(
         bound_norm = bound_norm[time_0:time_end,...]
         bound_edm = bound_edm[time_0:time_end,...]
         
-    return rsize, labels, wat, u, v, bound_labels, bound_norm, bound_edm, bound_data   
+    return bound_labels, bound_norm, bound_edm, bound_data   
+
+#%% Filt bounds
+
+
 
 #%% Make displays
 
 def _display_bounds(bound_data, bound_norm, bound_edm): 
     
-    bound_int_display = np.zeros(bound_norm.shape)
+    bound_norm_int_display = np.zeros(bound_norm.shape)
     bound_edm_int_display = np.zeros(bound_edm.shape)
     bound_edm_sd_display = np.zeros(bound_edm.shape)
     
@@ -863,16 +867,26 @@ def _display_bounds(bound_data, bound_norm, bound_edm):
         idx_y = bound['idx'][0]
         idx_x = bound['idx'][1]
         
-        bound_int_display[idx_y, idx_x] = bound['bound_int']
-        bound_edm_int_display[idx_y, idx_x] = bound['bound_edm_int']
-        bound_edm_sd_display[idx_y, idx_x] = bound['bound_edm_sd']
+        bound_norm_int_display[idx_y, idx_x] = bound['norm_int']
+        bound_edm_int_display[idx_y, idx_x] = bound['edm_int']
+        bound_edm_sd_display[idx_y, idx_x] = bound['edm_sd']
 
-    return bound_int_display, bound_edm_int_display, bound_edm_sd_display
+    return bound_norm_int_display, bound_edm_int_display, bound_edm_sd_display
     
 ''' ........................................................................'''
 
 def display_bounds(bound_data, bound_norm, bound_edm, parallel=True):  
     
+# Initialize ..................................................................
+    
+    # Add one dimension (if ndim = 2)
+    ndim = (bound_norm.ndim)        
+    if ndim == 2:
+        bound_norm = bound_norm.reshape((
+            1, bound_norm.shape[0], bound_norm.shape[1]))
+        bound_edm = bound_edm.reshape((
+            1, bound_edm.shape[0], bound_edm.shape[1]))
+
 # _process_bounds_preprocess ..................................................
 
     if parallel:
@@ -899,11 +913,22 @@ def display_bounds(bound_data, bound_norm, bound_edm, parallel=True):
             ]
         
     # Extract output
-    bound_int_display = np.stack([arrays[0] for arrays in output_list], axis=0)
-    bound_edm_int_display = np.stack([arrays[1] for arrays in output_list], axis=0)
-    bound_edm_sd_display = np.stack([arrays[2] for arrays in output_list], axis=0)
+    bound_norm_int_display = np.stack(
+        [arrays[0] for arrays in output_list], axis=0)
+    bound_edm_int_display = np.stack(
+        [arrays[1] for arrays in output_list], axis=0)
+    bound_edm_sd_display = np.stack(
+        [arrays[2] for arrays in output_list], axis=0)
     
-    return bound_int_display, bound_edm_int_display, bound_edm_sd_display
+# Terminate ...................................................................
+    
+    # Squeeze dimensions (if ndim == 2)   
+    if ndim == 2:
+        bound_norm_int_display = bound_norm_int_display.squeeze()
+        bound_edm_int_display = bound_edm_int_display.squeeze()
+        bound_edm_sd_display = bound_edm_sd_display.squeeze()
+    
+    return bound_norm_int_display, bound_edm_int_display, bound_edm_sd_display
 
 #%%
 
