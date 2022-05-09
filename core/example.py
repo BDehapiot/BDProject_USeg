@@ -15,10 +15,10 @@ from tasks import process
 ROOT_PATH = '../data/'
 
 # RAW_NAME = '13-12-06_40x_GBE_eCad_Ctrl_#19_Lite_uint8.tif'
-RAW_NAME = '13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif'
+# RAW_NAME = '13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif'
 # RAW_NAME = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_Lite_uint8.tif'
 # RAW_NAME = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
-# RAW_NAME = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
+RAW_NAME = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # RAW_NAME = '18-07-11_40x_GBE_UtrCH_Ctrl_b1_uint8.tif'
 # RAW_NAME = '18-07-11_40x_GBE_UtrCH_Ctrl_b1_Lite_uint8.tif'
 # RAW_NAME = 'Disc_Fixed_118hAEL_disc04_uint8.tif'
@@ -74,14 +74,7 @@ outputs = process(raw,
 
 bound_data = []
 for time_data in outputs['bound_data']:
-    bound_data = bound_data + time_data
-
-for data in bound_data:
-    
-    temp_data = np.concatenate(
-        (data['id'], data['norm_int'], data['edm_int']) )
-    
-
+    bound_data = bound_data + time_data  
 
 #%%
    
