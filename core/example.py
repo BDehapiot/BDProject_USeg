@@ -5,7 +5,7 @@ from skimage import io
 
 #%%
 
-from functions import best_ridge_size
+from functions import best_ridge_size, display_bounds
 from tasks import process
 
 #%% Parameters
@@ -29,7 +29,7 @@ RSIZE_FACTOR = 0.5 # must be <=1
 TIME_WINDOW = 3 # must be >=1 and odd 
 
 ''' 3) Preprocess '''
-RIDGE_SIZE = 'auto' 
+RIDGE_SIZE = 'auto'
 RIDGE_SIZE_COEFF = 0.75
 
 ''' 4) Watershed '''
@@ -66,10 +66,30 @@ if TIME_WINDOW < 1 or TIME_WINDOW % 2 == 0:
 
 #%%
 
-outputs, bound_int_display, bound_edm_int_display, bound_edm_sd_display = process(raw,
+outputs = process(raw,
     RSIZE_FACTOR, TIME_WINDOW, RIDGE_SIZE, THRESH_COEFF, THRESH_MIN_SIZE,
     PIV, PIV_WIN_SIZE)
 
+#%%
+
+bound_data = []
+for time_data in outputs['bound_data']:
+    bound_data = bound_data + time_data
+
+for data in bound_data:
+    
+    temp_data = np.concatenate(
+        (data['id'], data['norm_int'], data['edm_int']) )
+    
+
+
+#%%
+   
+displays = display_bounds(
+    outputs['bound_data'], 
+    outputs['bound_norm'], 
+    outputs['bound_edm']
+    )  
 
 #%% Save data
 
@@ -86,9 +106,9 @@ io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_labels.tif', outputs["bound_
 io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_norm.tif', outputs["bound_norm"].astype('float32'), check_contrast=False)
 io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_edm.tif', outputs["bound_edm"].astype('float32'), check_contrast=False)
 
-io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_int_display.tif', bound_int_display.astype('float32'), check_contrast=False)
-io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_edm_int_display.tif', bound_edm_int_display.astype('float32'), check_contrast=False)
-io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_edm_sd_display.tif', bound_edm_sd_display.astype('float32'), check_contrast=False)
+io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_norm_int_display.tif', displays[0].astype('float32'), check_contrast=False)
+io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_edm_int_display.tif', displays[1].astype('float32'), check_contrast=False)
+io.imsave(ROOT_PATH+'/temp/'+RAW_NAME[0:-4]+'_bound_edm_sd_display.tif', displays[2].astype('float32'), check_contrast=False)
 
 if PIV:
     
