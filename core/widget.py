@@ -64,20 +64,20 @@ def correct_bounds(rsize, wat):
 
     @viewer.bind_key('Enter')       
     def apply_user_inputs(viewer):
-        temp_inputs = viewer.layers['user_inputs']        
-        wat_correct = viewer.layers['wat']
-        wat_correct[temp_inputs != 0] = 0
-        viewer.layers['wat'].data = wat_correct
-        
-        return wat_correct
+        print('xxx')
+        output = viewer.layers['user_inputs']
+        return output
         
 #%%
-    
-    return user_inputs    
+
+    if output is None:
+        return user_inputs
+    else:
+        return user_inputs, output 
     
 #%%
 
-user_inputs  = correct_bounds(rsize_full[t,...], wat_full[t,...])
+test = correct_bounds(rsize_full[t,...], wat_full[t,...])
 
 #%%
 
