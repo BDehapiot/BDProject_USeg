@@ -18,45 +18,71 @@ for path in data_path.iterdir():
     if 'wat.tif' in path.name:
         wat_path = path
         print(wat_path.resolve())
-
-        
+     
 # open data
-rsize = imread(rsize_path) 
-wat = imread(wat_path) 
+rsize_full = imread(rsize_path) 
+wat_full = imread(wat_path) 
 
 # random seed
-t = randint(0, rsize.shape[0]-1)
-    
+t = randint(0, rsize_full.shape[0]-1)
+   
 #%% Initialize Viewer
 
-def correct_bounds():
+def correct_bounds(rsize, wat):
 
     class Viewer(napari.Viewer):
         pass
+    
+#%%
+
+    user_inputs = np.zeros_like(wat)    
 
 #%%
 
     viewer = Viewer()
     viewer.add_image(
-        rsize[t,...], name=f'rsize t={t}',
+        rsize, name='rsize',
         colormap='inferno',
         )
     viewer.add_image(
-        wat[t,...], name=f'wat t={t}',
+        wat, name='wat',
         colormap='gray',
-        blending='additive',        
+        blending='additive',       
+        )
+    viewer.add_labels(
+        user_inputs, 
+        name='user_inputs'
         )
 
 #%%
 
-    @viewer.bind_key('Enter')       
+    @viewer.bind_key('p')       
     def hide_wat(viewer):
-        print('hello')
+        viewer.layers['wat'].visible=False
         yield
-        print('goodbye')
+        viewer.layers['wat'].visible=True
 
+    @viewer.bind_key('Enter')       
+    def apply_user_inputs(viewer):
+        temp_inputs = viewer.layers['user_inputs']        
+        wat_correct = viewer.layers['wat']
+        wat_correct[temp_inputs != 0] = 0
+        viewer.layers['wat'].data = wat_correct
+        
+        return wat_correct
+        
+#%%
+    
+    return user_inputs    
     
 #%%
 
-correct_bounds()
-    
+user_inputs  = correct_bounds(rsize_full[t,...], wat_full[t,...])
+
+#%%
+
+# test_inputs = user_inputs.copy()
+# test_wat = wat.copy()
+# test_wat[test_inputs != 0] = 0
+# viewer = napari.Viewer()
+# viewer.add_image(test_wat) 
