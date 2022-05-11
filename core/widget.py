@@ -2,8 +2,9 @@
 
 import napari
 import numpy as np
-from skimage.io import imread
 from pathlib import Path
+from magicgui import magicgui
+from skimage.io import imread
 
 from tools.conn import labconn
 
@@ -12,10 +13,13 @@ from tools.conn import labconn
 # Create paths
 root_path = Path(__file__).parents[1]
 data_path = Path(root_path / 'data' / 'temp')
+
 for path in data_path.iterdir():
+    
     if 'rsize.tif' in path.name:
         rsize_path = path
         print(rsize_path.resolve())
+    
     if 'wat.tif' in path.name:
         wat_path = path
         print(wat_path.resolve())
@@ -24,79 +28,90 @@ for path in data_path.iterdir():
 rsize = imread(rsize_path) 
 wat = imread(wat_path) 
    
-#%% Initialize Viewer
-def correct_bounds():
+#%% Initialize
+def correct_bounds(rsize, wat):
+    
+    watnew = wat.copy()
+    inputs = np.zeros_like(wat)
 
     class Viewer(napari.Viewer):
         pass
-    
-    Viewer.frame = 0
-    
-    
-#%%      
-        
-
-#%%
-
+     
     viewer = Viewer()
     
     viewer.add_image(
-        rsize[Viewer.frame,...], 
+        rsize[0,...], 
         name='rsize',
         colormap='inferno',
         )
     
     viewer.add_image(
-        wat[Viewer.frame,...], 
-        name='wat',
+        watnew[0,...], 
+        name='watnew',
         colormap='gray',
         blending='additive',       
-        )
+        )  
     
     viewer.add_labels(
-        np.zeros_like(wat[Viewer.frame,...]), 
+        inputs[0,...], 
         name='inputs',
         opacity=0.5,
         )
     
-    viewer.layers['inputs'].brush_size = 10
-    viewer.layers['inputs'].mode = 'PAINT'
-
 #%%
 
-    @viewer.bind_key('h')       
-    def hide_wat(viewer):
+    @magicgui(
         
-        viewer.layers['wat'].visible=False        
-        yield
-        viewer.layers['wat'].visible=True
-
-    @viewer.bind_key('Enter')       
-    def apply_inputs(viewer):
+        auto_call = True,
                
-        wat_corrected = wat.copy()
-        wat_corrected[viewer.layers['inputs'].data != 0] = 0           
-        viewer.layers['wat'].data = (labconn(wat_corrected) > 1)*255
-        viewer.layers['inputs'].data = np.zeros_like(wat) 
+        frame = {
+            'widget_type': 'SpinBox', 
+            'label': 'frame',
+            'min': 0, 'max': wat.shape[0]-1,
+            'visible': True,
+            },
         
-    @viewer.bind_key('Backspace') 
-    def undo_inputs(viewer):
-
-        viewer.layers['wat'].data = wat
-         
+        )
+    
+    def display(
+            frame: int,
+            ):
+        
+        frame = display.frame.value       
+        viewer.layers['rsize'].data = rsize[frame,...]
+        viewer.layers['wat'].data = wat[frame,...]  
+        
 #%%
 
-    return wat 
+    viewer.window.add_dock_widget(display, area='right', name='widget') 
     
 #%%
 
-wat = correct_bounds()
+    @viewer.bind_key('Right')
+    def next_frame(viewer):
 
-viewer = napari.Viewer()
-viewer.add_image(wat)
+        if display.frame.value < wat.shape[0]-1:
+            display.frame.value += 1
+            
+    @viewer.bind_key('Left')
+    def previous_frame(viewer):
+
+        if display.frame.value > 0:
+            display.frame.value -= 1
+            
+    # @viewer.bind_key('Enter')       
+    # def apply_inputs(viewer):
+               
+    #     viewer.layers['watnew'].data[viewer.layers['inputs'].data != 0] = 0           
+    #     viewer.layers['watnew'].data = (labconn(viewer.layers['watnew'].data) > 1)*255
+    #     viewer.layers['inputs'].data = np.zeros_like(wat) 
+        
+             
+#%%
+
+wat = correct_bounds(rsize, wat)
 
 #%%
 
-# wat_conn = labconn(wat)
 # viewer = napari.Viewer()
-# viewer.add_image((wat_conn > 1)*255)
+# viewer.add_image(wat)
