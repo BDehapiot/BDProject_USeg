@@ -2,9 +2,10 @@
 
 import napari
 import numpy as np
-from random import randint
 from skimage.io import imread
 from pathlib import Path
+
+from tools.conn import labconn
 
 #%% Initialize
 
@@ -20,69 +21,82 @@ for path in data_path.iterdir():
         print(wat_path.resolve())
      
 # open data
-rsize_full = imread(rsize_path) 
-wat_full = imread(wat_path) 
-
-# random seed
-t = randint(0, rsize_full.shape[0]-1)
+rsize = imread(rsize_path) 
+wat = imread(wat_path) 
    
 #%% Initialize Viewer
-
-def correct_bounds(rsize, wat):
+def correct_bounds():
 
     class Viewer(napari.Viewer):
         pass
     
-#%%
-
-    user_inputs = np.zeros_like(wat)    
+    Viewer.frame = 0
+    
+    
+#%%      
+        
 
 #%%
 
     viewer = Viewer()
+    
     viewer.add_image(
-        rsize, name='rsize',
+        rsize[Viewer.frame,...], 
+        name='rsize',
         colormap='inferno',
         )
+    
     viewer.add_image(
-        wat, name='wat',
+        wat[Viewer.frame,...], 
+        name='wat',
         colormap='gray',
         blending='additive',       
         )
+    
     viewer.add_labels(
-        user_inputs, 
-        name='user_inputs'
+        np.zeros_like(wat[Viewer.frame,...]), 
+        name='inputs',
+        opacity=0.5,
         )
+    
+    viewer.layers['inputs'].brush_size = 10
+    viewer.layers['inputs'].mode = 'PAINT'
 
 #%%
 
-    @viewer.bind_key('p')       
+    @viewer.bind_key('h')       
     def hide_wat(viewer):
-        viewer.layers['wat'].visible=False
+        
+        viewer.layers['wat'].visible=False        
         yield
         viewer.layers['wat'].visible=True
 
     @viewer.bind_key('Enter')       
-    def apply_user_inputs(viewer):
-        print('xxx')
-        output = viewer.layers['user_inputs']
-        return output
+    def apply_inputs(viewer):
+               
+        wat_corrected = wat.copy()
+        wat_corrected[viewer.layers['inputs'].data != 0] = 0           
+        viewer.layers['wat'].data = (labconn(wat_corrected) > 1)*255
+        viewer.layers['inputs'].data = np.zeros_like(wat) 
         
+    @viewer.bind_key('Backspace') 
+    def undo_inputs(viewer):
+
+        viewer.layers['wat'].data = wat
+         
 #%%
 
-    if output is None:
-        return user_inputs
-    else:
-        return user_inputs, output 
+    return wat 
     
 #%%
 
-test = correct_bounds(rsize_full[t,...], wat_full[t,...])
+wat = correct_bounds()
+
+viewer = napari.Viewer()
+viewer.add_image(wat)
 
 #%%
 
-# test_inputs = user_inputs.copy()
-# test_wat = wat.copy()
-# test_wat[test_inputs != 0] = 0
+# wat_conn = labconn(wat)
 # viewer = napari.Viewer()
-# viewer.add_image(test_wat) 
+# viewer.add_image((wat_conn > 1)*255)
