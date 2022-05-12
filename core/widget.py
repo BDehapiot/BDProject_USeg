@@ -58,6 +58,9 @@ def correct_bounds(rsize, wat):
         opacity=0.5,
         )
     
+    viewer.layers['inputs'].brush_size = 6
+    viewer.layers['inputs'].mode = 'PAINT'
+    
 #%%
 
     @magicgui(
@@ -77,9 +80,9 @@ def correct_bounds(rsize, wat):
             frame: int,
             ):
         
-        frame = display.frame.value       
-        viewer.layers['rsize'].data = rsize[frame,...]
-        viewer.layers['wat'].data = wat[frame,...]  
+        i = display.frame.value       
+        viewer.layers['rsize'].data = rsize[i,...]
+        viewer.layers['watnew'].data = watnew[i,...]  
         
 #%%
 
@@ -98,13 +101,28 @@ def correct_bounds(rsize, wat):
 
         if display.frame.value > 0:
             display.frame.value -= 1
-            
-    # @viewer.bind_key('Enter')       
-    # def apply_inputs(viewer):
+  
+    @viewer.bind_key('Enter')       
+    def apply_inputs(viewer):
+        
+        i = display.frame.value 
+        inputs[i,...] = viewer.layers['inputs'].data
+        watnew[i,...] = viewer.layers['watnew'].data
+        
+        watnew[i,...][inputs[i,...] != 0] = 0
+        watnew[i,...] = (labconn(watnew[i,...]) > 1) * 255
+        viewer.layers['watnew'].data = watnew[i,...] 
                
-    #     viewer.layers['watnew'].data[viewer.layers['inputs'].data != 0] = 0           
-    #     viewer.layers['watnew'].data = (labconn(viewer.layers['watnew'].data) > 1)*255
-    #     viewer.layers['inputs'].data = np.zeros_like(wat) 
+        # frame = display.frame.value 
+        # inputs = viewer.layers['inputs'].data
+
+        # watnew[frame,...][inputs != 0] = 0
+        # watnew[frame,...] = (labconn(watnew[frame,...]) > 1) * 255
+        # viewer.layers['watnew'].data = watnew[frame,...] 
+        
+        # viewer.layers['watnew'].data[viewer.layers['inputs'].data != 0] = 0           
+        # viewer.layers['watnew'].data = (labconn(viewer.layers['watnew'].data) > 1)*255
+        # viewer.layers['inputs'].data = np.zeros_like(wat) 
         
              
 #%%
