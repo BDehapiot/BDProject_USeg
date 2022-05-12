@@ -29,10 +29,11 @@ rsize = imread(rsize_path)
 wat = imread(wat_path) 
    
 #%% Initialize
-def correct_bounds(rsize, wat):
+def correct_wat(rsize, wat):
     
     watnew = wat.copy()
     inputs = np.zeros_like(wat)
+    inputs_empty = inputs[0,...].copy()
 
     class Viewer(napari.Viewer):
         pass
@@ -53,7 +54,7 @@ def correct_bounds(rsize, wat):
         )  
     
     viewer.add_labels(
-        inputs[0,...], 
+        inputs_empty.copy(), 
         name='inputs',
         opacity=0.5,
         )
@@ -82,7 +83,8 @@ def correct_bounds(rsize, wat):
         
         i = display.frame.value       
         viewer.layers['rsize'].data = rsize[i,...]
-        viewer.layers['watnew'].data = watnew[i,...]  
+        viewer.layers['watnew'].data = watnew[i,...] 
+        viewer.layers['inputs'].data = inputs_empty.copy() 
         
 #%%
 
@@ -105,31 +107,51 @@ def correct_bounds(rsize, wat):
     @viewer.bind_key('Enter')       
     def apply_inputs(viewer):
         
+        # update inputs
         i = display.frame.value 
-        inputs[i,...] = viewer.layers['inputs'].data
-        watnew[i,...] = viewer.layers['watnew'].data
+        inputs[i,...][inputs[i,...] != 0] += 1        
+        inputs[i,...] = np.maximum(
+            inputs[i,...], viewer.layers['inputs'].data)
         
+        # apply inputs
+        watnew[i,...] = wat[i,...]
         watnew[i,...][inputs[i,...] != 0] = 0
         watnew[i,...] = (labconn(watnew[i,...]) > 1) * 255
-        viewer.layers['watnew'].data = watnew[i,...] 
-               
-        # frame = display.frame.value 
-        # inputs = viewer.layers['inputs'].data
+        
+        # update layers
+        viewer.layers['inputs'].data = inputs_empty.copy()
+        viewer.layers['watnew'].data = watnew[i,...]
 
-        # watnew[frame,...][inputs != 0] = 0
-        # watnew[frame,...] = (labconn(watnew[frame,...]) > 1) * 255
-        # viewer.layers['watnew'].data = watnew[frame,...] 
+    @viewer.bind_key('Backspace')
+    def undo_last_input(viewer):
         
-        # viewer.layers['watnew'].data[viewer.layers['inputs'].data != 0] = 0           
-        # viewer.layers['watnew'].data = (labconn(viewer.layers['watnew'].data) > 1)*255
-        # viewer.layers['inputs'].data = np.zeros_like(wat) 
+        # update inputs
+        i = display.frame.value 
+        inputs[i,...][inputs[i,...] != 0] -= 1  
         
+        # apply inputs
+        watnew[i,...] = wat[i,...]
+        watnew[i,...][inputs[i,...] != 0] = 0
+        watnew[i,...] = (labconn(watnew[i,...]) > 1) * 255
+        
+        # update layers
+        viewer.layers['inputs'].data = inputs_empty.copy()
+        viewer.layers['watnew'].data = watnew[i,...]
+
+#%%
+        
+    return inputs            
              
 #%%
 
-wat = correct_bounds(rsize, wat)
+inputs = correct_wat(rsize, wat)
+
+#%%
+
+# from skimage import io
+# io.imsave(Path(data_path /'inputs_test.tif'), inputs[26,...].astype('uint8')*255, check_contrast=False)
 
 #%%
 
 # viewer = napari.Viewer()
-# viewer.add_image(wat)
+# viewer.add_image(inputs[26,...])
