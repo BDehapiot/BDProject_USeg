@@ -853,7 +853,6 @@ def process_bounds(
 #%% Filt bounds
 
 
-
 #%% Make displays
 
 def _display_bounds(bound_data, bound_norm, bound_edm): 
