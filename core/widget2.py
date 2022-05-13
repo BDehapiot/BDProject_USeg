@@ -42,7 +42,9 @@ def apply_inputs(inputs, ridges, wat):
             props['centroid-1'], 
             props['intensity_min']
             ):
-                
+        
+        print(int_min)
+        
         if int_min != 0:
             inputs_add[round(ctrd_y), round(ctrd_x)] = idx
             inputs_remove[input_labels == idx] = 0
@@ -61,13 +63,10 @@ def apply_inputs(inputs, ridges, wat):
         temp_wat = temp_wat != mask
         watnew[temp_wat == True] = 255
         
-    labnew = label(np.invert(watnew), connectivity=1) 
-    labnew[labnew == 1] = 0
-        
     # imsave(Path(data_path /'inputs_add.tif'), inputs_add, check_contrast=False)        
     # imsave(Path(data_path /'inputs_remove.tif'), inputs_remove, check_contrast=False) 
 
-    return watnew, labnew
+    return watnew
 
 
 #%% Open data
@@ -98,7 +97,6 @@ wat = imread(wat_path)
 #%% Initialize
 def correct_wat(rsize, ridges, wat):
     
-    labnew = labels.copy()
     watnew = wat.copy()
     inputs = np.zeros_like(wat)
     inputs_empty = inputs[0,...].copy()
@@ -121,9 +119,16 @@ def correct_wat(rsize, ridges, wat):
         blending='additive',       
         )  
     
+    # viewer.add_image(
+    #     labels[0,...], 
+    #     name='labels',
+    #     colormap='GrBu',
+    #     opacity = 0.33,     
+    #     )     
+    
     viewer.add_labels(
-        labnew[0,...], 
-        name='labnew',
+        labels[0,...], 
+        name='labels',
         opacity = 0.33,     
         )  
     
@@ -194,16 +199,14 @@ def correct_wat(rsize, ridges, wat):
         # watnew[i,...] = (labconn(watnew[i,...]) > 1) * 255
         
         # Apply inputs (new)
-        watnew[i,...] = wat[i,...]
-        labnew[i,...] = labels[i,...]
-        watnew[i,...], labnew[i,...] = apply_inputs(
+        watnew[i,...] = apply_inputs(
             inputs[i,...], ridges[i,...], watnew[i,...]
             )
 
         # Update layers
         viewer.layers['inputs'].data = inputs_empty.copy()
         viewer.layers['watnew'].data = watnew[i,...]
-        viewer.layers['labnew'].data = labnew[i,...] 
+        viewer.layers['labels'].data = label(np.invert(watnew[i,...])) 
 
     @viewer.bind_key('Backspace')
     def remove_inputs(viewer):
@@ -212,22 +215,14 @@ def correct_wat(rsize, ridges, wat):
         i = display.frame.value 
         inputs[i,...][inputs[i,...] != 0] -= 1  
         
-        # # Apply inputs
-        # watnew[i,...] = wat[i,...]
-        # watnew[i,...][inputs[i,...] != 0] = 0
-        # watnew[i,...] = (labconn(watnew[i,...]) > 1) * 255
-        
-        # Apply inputs (new)
+        # apply inputs
         watnew[i,...] = wat[i,...]
-        labnew[i,...] = labels[i,...]
-        watnew[i,...], labnew[i,...] = apply_inputs(
-            inputs[i,...], ridges[i,...], watnew[i,...]
-            )
+        watnew[i,...][inputs[i,...] != 0] = 0
+        watnew[i,...] = (labconn(watnew[i,...]) > 1) * 255
         
         # update layers
         viewer.layers['inputs'].data = inputs_empty.copy()
         viewer.layers['watnew'].data = watnew[i,...]
-        viewer.layers['labnew'].data = labnew[i,...] 
 
 #%%
         
