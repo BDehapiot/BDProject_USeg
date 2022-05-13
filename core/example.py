@@ -18,22 +18,24 @@ ROOT_PATH = '../data/'
 # RAW_NAME = '13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif'
 # RAW_NAME = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_Lite_uint8.tif'
 # RAW_NAME = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
-RAW_NAME = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
+# RAW_NAME = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # RAW_NAME = '18-07-11_40x_GBE_UtrCH_Ctrl_b1_uint8.tif'
 # RAW_NAME = '18-07-11_40x_GBE_UtrCH_Ctrl_b1_Lite_uint8.tif'
 # RAW_NAME = 'Disc_Fixed_118hAEL_disc04_uint8.tif'
 # RAW_NAME = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
+
+RAW_NAME = 'ecadgfp_sqhmch_200820_e4_controlforhkbfog_Ecad_MAX.tif'
 
 ''' 2) General options '''
 RSIZE_FACTOR = 0.5 # must be <=1
 TIME_WINDOW = 3 # must be >=1 and odd 
 
 ''' 3) Preprocess '''
-RIDGE_SIZE = 'auto'
+RIDGE_SIZE = 10 #'auto'
 RIDGE_SIZE_COEFF = 0.75
 
 ''' 4) Watershed '''
-THRESH_COEFF = 0.5 
+THRESH_COEFF = 1.0 
 THRESH_MIN_SIZE = int(3000*RSIZE_FACTOR) 
 
 ''' 5) PIV '''
