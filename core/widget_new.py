@@ -42,9 +42,7 @@ def apply_inputs(inputs, ridges, wat):
             props['centroid-1'], 
             props['intensity_min']
             ):
-        
-        print(int_min)
-        
+
         if int_min != 0:
             inputs_add[round(ctrd_y), round(ctrd_x)] = idx
             inputs_remove[input_labels == idx] = 0
@@ -96,17 +94,21 @@ wat = imread(wat_path)
 
 #%% Initialize
 def correct_wat(rsize, ridges, wat):
-
-    watlist = [[wat[i,...]] for i in range(wat.shape[0])] 
-    
+  
     watnew = wat.copy()
+    labnew = labels.copy()
     inputs = np.zeros_like(wat[0,...])
-
+    
     class Viewer(napari.Viewer):
         pass
-     
-    viewer = Viewer()
     
+    # Create watlist
+    Viewer.watlist = [
+        [wat[i,...]] for i in range(wat.shape[0])
+        ] 
+         
+    viewer = Viewer()
+             
     viewer.add_image(
         rsize[0,...], 
         name='rsize',
@@ -121,8 +123,8 @@ def correct_wat(rsize, ridges, wat):
         )  
         
     viewer.add_labels(
-        labels[0,...], 
-        name='labels',
+        labnew[0,...], 
+        name='labnew',
         opacity = 0.33,     
         )  
     
@@ -131,9 +133,10 @@ def correct_wat(rsize, ridges, wat):
         name='inputs',
         opacity=0.5,
         )
-    
+
     viewer.layers['inputs'].brush_size = 6
     viewer.layers['inputs'].mode = 'PAINT'
+    
     
 #%%
 
@@ -157,9 +160,9 @@ def correct_wat(rsize, ridges, wat):
         i = display.frame.value       
         viewer.layers['rsize'].data = rsize[i,...]
         viewer.layers['watnew'].data = watnew[i,...] 
-        viewer.layers['labels'].data = labels[i,...] 
+        viewer.layers['labnew'].data = labnew[i,...] 
         viewer.layers['inputs'].data = inputs.copy() 
-        
+
 #%%
 
     viewer.window.add_dock_widget(display, area='right', name='widget') 
@@ -181,57 +184,62 @@ def correct_wat(rsize, ridges, wat):
     @viewer.bind_key('Enter')       
     def add_inputs(viewer):
         
+        # Extract info
         i = display.frame.value 
         
         # Apply inputs
-        watlist[i].append(apply_inputs(
+        watnew[i,...] = apply_inputs(
             viewer.layers['inputs'].data, 
             ridges[i,...], watnew[i,...]
-            )
-        )
-
-        watnew[i,...] = watlist[i][-1]
+            )        
+        labnew[i,...] = label(
+            np.invert(watnew[i,...]), connectivity=1
+            ) - 1
                 
         # Update layers
+        viewer.watlist[i].append(watnew[i,...].copy())
         viewer.layers['watnew'].data = watnew[i,...]
-        viewer.layers['labels'].data = label(np.invert(watnew[i,...])) 
+        viewer.layers['labnew'].data = labnew[i,...] 
         viewer.layers['inputs'].data = inputs.copy()
-
+        
     @viewer.bind_key('Backspace')
     def remove_inputs(viewer):
         
-        # update inputs
+        # Extract info
         i = display.frame.value 
-        inputs[i,...][inputs[i,...] != 0] -= 1  
         
-        # apply inputs
-        watnew[i,...] = wat[i,...]
-        watnew[i,...][inputs[i,...] != 0] = 0
-        watnew[i,...] = (labconn(watnew[i,...]) > 1) * 255
-        
-        # update layers
-        viewer.layers['inputs'].data = inputs_empty.copy()
-        viewer.layers['watnew'].data = watnew[i,...]
-
+        if len(viewer.watlist[i]) > 1:
+            
+            # Apply inputs
+            watnew[i,...] = viewer.watlist[i][-2]          
+            labnew[i,...] = label(
+                np.invert(watnew[i,...]), connectivity=1
+                ) - 1
+            
+            # Update layers
+            viewer.watlist[i].pop()
+            viewer.layers['watnew'].data = watnew[i,...]
+            viewer.layers['labnew'].data = labnew[i,...] 
+            viewer.layers['inputs'].data = inputs.copy()
+            
 #%%
         
-    return inputs            
+    return inputs, viewer.watlist      
              
 #%%
 
-inputs = correct_wat(rsize, ridges, wat)
+inputs, watlist = correct_wat(rsize, ridges, wat)
 
 #%%
 
-watlist = [[wat[i,...]] for i in range(wat.shape[0])] 
-watlist[0].append(wat[0])
-watlist[0].append(wat[0])
-watlist[0].pop()
+# ones = np.full_like(wat[0,...], 1)
+# twos = np.full_like(wat[0,...], 2)
 
+# watlist[0].append(ones)
+# watlist[0].append(twos)
 
-#%%
-
-
+viewer = napari.Viewer()
+viewer.add_image(watlist[0][1])
 
 #%%
 
