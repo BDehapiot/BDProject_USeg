@@ -20,14 +20,6 @@ def apply_inputs(inputs, ridges, wat):
     labels = label(np.invert(wat), connectivity=1)
     wat_labels = labels.copy()
     wat_labels[wat != 0] = 0
-    
-    # print(labels.shape)
-    # print(labels.dtype)
-    # print(wat_labels.shape)
-    # print(wat_labels.dtype)
-    
-    # imsave(Path(data_path /'labels.tif'), labels, check_contrast=False) 
-    # imsave(Path(data_path /'wat_labels.tif'), wat_labels, check_contrast=False)    
 
     props = regionprops_table(
         input_labels, wat_labels, 
@@ -60,10 +52,7 @@ def apply_inputs(inputs, ridges, wat):
         temp_wat = temp_wat > 0
         temp_wat = temp_wat != mask
         watnew[temp_wat == True] = 255
-        
-    # imsave(Path(data_path /'inputs_add.tif'), inputs_add, check_contrast=False)        
-    # imsave(Path(data_path /'inputs_remove.tif'), inputs_remove, check_contrast=False) 
-
+    
     return watnew
 
 
@@ -93,6 +82,7 @@ labels = imread(labels_path)
 wat = imread(wat_path) 
 
 #%% Initialize
+
 def correct_wat(rsize, ridges, wat):
   
     watnew = wat.copy()
@@ -224,22 +214,11 @@ def correct_wat(rsize, ridges, wat):
             
 #%%
         
-    return inputs, viewer.watlist      
+    return inputs   
              
 #%%
 
-inputs, watlist = correct_wat(rsize, ridges, wat)
-
-#%%
-
-# ones = np.full_like(wat[0,...], 1)
-# twos = np.full_like(wat[0,...], 2)
-
-# watlist[0].append(ones)
-# watlist[0].append(twos)
-
-viewer = napari.Viewer()
-viewer.add_image(watlist[0][1])
+inputs = correct_wat(rsize, ridges, wat)
 
 #%%
 
