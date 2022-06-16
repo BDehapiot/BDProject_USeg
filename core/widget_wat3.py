@@ -1,10 +1,12 @@
 #%% Imports
-
 import napari
 import numpy as np
+
 from skimage import io
 from pathlib import Path
+
 from magicgui import magicgui
+# from napari.utils.notifications import show_info
 
 from functions import preprocess, watseg
 
@@ -48,12 +50,10 @@ def get_wat(raw):
         raw[raw.shape[0]//2,...], 
         name='raw',
         colormap='gray',
-        )
-    
-    viewer.add_image(
-        np.zeros_like(raw[0,...]), 
-        name='wat',
-        colormap='gray',
+        contrast_limits=(
+            np.quantile(raw, 0.001),
+            np.quantile(raw, 0.999),
+            ),
         )
                  
 #%%
@@ -77,10 +77,10 @@ def get_wat(raw):
             },
         
         ridge_size = {
-            'widget_type': 'SpinBox', 
+            'widget_type': 'FloatSpinBox', 
             'label': 'ridge size (pixels)',
-            'min': 0, 'max': 20, 'step': 1,
-            'value': 5,
+            'min': 0, 'max': 20, 'step': 0.5,
+            'value': 3,
             },
         
         thresh_coeff = {
@@ -115,33 +115,38 @@ def get_wat(raw):
             ):
         
         # Get info
-        i = display.frame.value  
-                
-        # Clear the viewer
-        if viewer.layers.__contains__('raw'):
-            viewer.layers.remove('raw')   
-        if viewer.layers.__contains__('ridges'):
-            viewer.layers.remove('ridges') 
-        if viewer.layers.__contains__('rsize'): 
-            viewer.layers.remove('rsize') 
-        if viewer.layers.__contains__('mask'):
-            viewer.layers.remove('mask') 
-        if viewer.layers.__contains__('wat'): 
-            viewer.layers.remove('wat') 
+        i = display.frame.value         
+        viewer.text_overlay.visible = True
+        viewer.text_overlay.text = f'frame = {i}'
                 
         if not preview:
             
-            viewer.add_image(
-                raw[i,...], 
-                name='raw',
-                colormap='inferno',
-                )
-                    
-            viewer.grid.enabled = False
-            viewer.reset_view()
+            if viewer.layers.__contains__('raw'):               
+                viewer.layers['raw'].data = raw[i,...]
+                
+            else:
+                
+                if viewer.layers.__contains__('rsize'): 
+                    viewer.layers.remove('rsize') 
+                if viewer.layers.__contains__('wat'): 
+                    viewer.layers.remove('wat') 
+                
+                viewer.add_image(
+                    raw[i,...], 
+                    name='raw',
+                    colormap='gray',
+                    contrast_limits=(
+                        np.quantile(raw, 0.001),
+                        np.quantile(raw, 0.999),
+                        ),
+                    )
+                                
+                viewer.reset_view()
 
         else:
-               
+            
+            # Get wat preview -------------------------------------------------
+            
             rsize, ridges = preprocess(
                 raw[i,...], 
                 display.rsize_factor.value,
@@ -155,65 +160,54 @@ def get_wat(raw):
                 thresh_min_size*rsize_factor, 
                 parallel=False,
                 )
-                                   
-            viewer.add_image(
-                rsize, 
-                name='rsize',
-                colormap='gray',
-                contrast_limits=(
-                    np.quantile(rsize, 0.001),
-                    np.quantile(rsize, 0.999),
-                    ),
-                )
             
-            viewer.add_image(
-                wat, 
-                name='wat',
-                colormap='red',
-                contrast_limits=(0, 1),
-                blending='additive',
-                )
+            # Update viewer ---------------------------------------------------
+                        
+            if viewer.layers.__contains__('rsize'): 
+                viewer.layers['rsize'].data = rsize 
+                
+            else:
+                
+                viewer.add_image(
+                    rsize, 
+                    name='rsize',
+                    colormap='gray',
+                    contrast_limits=(
+                        np.quantile(rsize, 0.001),
+                        np.quantile(rsize, 0.999),
+                        ),
+                    )
             
-            # viewer.grid.enabled = True  
-            # viewer.reset_view()
+            if viewer.layers.__contains__('wat'): 
+                viewer.layers['wat'].data = wat
+                
+            else:
 
+                viewer.add_image(
+                    wat, 
+                    name='wat',
+                    colormap='red',
+                    contrast_limits=(0, 1),
+                    blending='additive',
+                    )
+                
+            if viewer.layers.__contains__('raw'):               
+                viewer.layers.remove('raw')
+                viewer.reset_view()
+                
 #%%
 
     viewer.window.add_dock_widget(display, area='right', name='widget') 
     
 #%%
 
-    # viewer.add_image(
-    #     rsize, 
-    #     name='rsize',
-    #     colormap='inferno',
-    #     contrast_limits=(
-    #         np.quantile(rsize, 0.001),
-    #         np.quantile(rsize, 0.999),
-    #         ),
-    #     )
+    @display.rsize_factor.changed.connect
+    def rsize_factor_zoom_callback():
+        print(viewer.camera.center)
+        viewer.reset_view()
+        
 
-    # viewer.add_image(
-    #     ridges, 
-    #     name='ridges',
-    #     colormap='inferno',
-    #     contrast_limits=(
-    #         np.quantile(ridges, 0.001),
-    #         np.quantile(ridges, 0.999),
-    #         ),
-    #     )
-    
-    # viewer.add_image(
-    #     mask, 
-    #     name='mask',
-    #     colormap='gray',
-    #     contrast_limits=(
-    #         0,
-    #         1,
-    #         ),
-    #     )
 
-    
 #%%
 
     @viewer.bind_key('Right')
@@ -227,6 +221,22 @@ def get_wat(raw):
 
         if display.frame.value > 0:
             display.frame.value -= 1
+            
+    @viewer.bind_key('p', overwrite=True)
+    def hide_wat(viewer):
+        
+        napari.window.Window(viewer, show=True)
+        # viewer.layers.selection.active = viewer.layers['wat']
+
+        if viewer.layers.__contains__('wat'): 
+            
+            viewer.layers['wat'].visible = False
+            
+            yield
+            
+            viewer.layers['wat'].visible = True
+    
+
     
 #%%
 
