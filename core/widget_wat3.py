@@ -6,7 +6,6 @@ from skimage import io
 from pathlib import Path
 
 from magicgui import magicgui
-# from napari.utils.notifications import show_info
 
 from functions import preprocess, watseg
 
@@ -225,7 +224,7 @@ def get_wat(raw):
     @viewer.bind_key('p', overwrite=True)
     def hide_wat(viewer):
         
-        napari.window.Window(viewer, show=True)
+        # napari.window.Window(viewer, show=True)
         # viewer.layers.selection.active = viewer.layers['wat']
 
         if viewer.layers.__contains__('wat'): 
