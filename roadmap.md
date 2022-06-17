@@ -7,4 +7,14 @@ Option #2 - Use the `FileEdit` widget from magicgui
 
 ## 2) Starting layout
 
-Main image - raw
+Main image
+- raw
+
+Main option panel
+- raw path (FileEdit)
+- frame
+
+Get watershed option panel
+- resizing factor
+- ridge size
+- thresh coeff
