@@ -1,4 +1,4 @@
-name: USeg
+name: BDProject_USeg
 
 channels:
     - conda-forge

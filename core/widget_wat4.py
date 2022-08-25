@@ -13,8 +13,8 @@ from functions import preprocess, watseg
 
 # raw_name  = "13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_Lite_uint8.tif"
 # raw_name  = "13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif"
-raw_name  = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif"
 # raw_name  = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite_uint8.tif"
+raw_name  = "13-12-06_40x_GBE_eCad_Ctrl_#19_Lite2_uint8.tif"
 # raw_name  = "17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif"
 # raw_name  = "18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif"
 # raw_name  = "18-07-11_40x_GBE_UtrCH_Ctrl_b1_Lite_uint8.tif"
