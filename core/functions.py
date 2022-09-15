@@ -26,6 +26,9 @@ def preprocess(raw, rsize_factor, ridge_size, parallel=True):
     
     ridge_size : int
         Description.
+        
+    parallel : bool
+        Description.
     
     Returns
     -------  
@@ -42,12 +45,12 @@ def preprocess(raw, rsize_factor, ridge_size, parallel=True):
     
     # Nested function ---------------------------------------------------------
     
-    def _preprocess():
+    def _preprocess(raw, rsize_factor, ridge_size):
         
         # Resize raw
         rsize = resize(raw, (
-            int(raw.shape[0]*rsize_factor), 
-            int(raw.shape[1]*rsize_factor)),
+            int(raw.shape[0]//rsize_factor), 
+            int(raw.shape[1]//rsize_factor)),
             preserve_range=True, 
             anti_aliasing=True
             )            
@@ -109,73 +112,6 @@ def preprocess(raw, rsize_factor, ridge_size, parallel=True):
 
 #%% Watershed segmentation
 
-def _watseg(ridges, mask, thresh_min_size):
-    
-    ''' General description.
-    
-    Parameters
-    ----------
-    ridges : np.ndarray
-        Description.
-        
-    mask : np.ndarray (bool)
-        Description.
-
-    Returns
-    -------  
-    mask : np.ndarray
-        Description.
-        
-    markers : np.ndarray
-        Description.
-    
-    labels : np.ndarray
-        Description.
-    
-    wat : np.ndarray
-        Description.        
-        
-    Notes
-    -----   
-    
-    '''
-
-    # Get seed mask
-    mask = remove_small_objects(mask, min_size=thresh_min_size) 
-    
-    # Get watershed 
-    markers = label(np.invert(mask), connectivity=1)  
-    labels = watershed(ridges, markers, compactness=1, watershed_line=True) 
-    wat = labels == 0
-        
-    # Process labels
-    labels = clear_border(labels)
-    temp_mask = binary_dilation(labels > 0)
-    temp_mask = remove_small_holes(temp_mask, area_threshold=2)
-    labels = expand_labels(labels, distance=2)
-    labels[temp_mask == 0] = 0
-      
-    # # Remove border cells    
-    # temp_mask = binary_erosion(labels > 0)    
-    # all_id = np.unique(labels)
-    # for cell_id in all_id:
-    #     idx = bd_where(labels, cell_id)    
-    #     if False in temp_mask[idx]:
-    #         labels[idx] = 0
-                       
-    # Remove isolated cells
-    temp_mask = labels > 0
-    temp_mask = remove_small_objects(temp_mask, min_size = thresh_min_size)
-    labels[temp_mask==0] = 0  
-    
-    # Clean wat & vertices
-    temp_mask = binary_dilation(labels > 0)
-    wat[temp_mask == 0] = 0
-     
-    return mask, markers, labels, wat
-
-''' ........................................................................'''
-
 def watseg(ridges, thresh_coeff, thresh_min_size, parallel=True):
     
     ''' General description.
@@ -190,6 +126,9 @@ def watseg(ridges, thresh_coeff, thresh_min_size, parallel=True):
     
     thresh_min_size : int
         Description.
+        
+    parallel : bool
+        Description.
 
     Returns
     -------  
@@ -209,6 +148,46 @@ def watseg(ridges, thresh_coeff, thresh_min_size, parallel=True):
     -----   
     
     '''
+    
+    # Nested function ---------------------------------------------------------
+    
+    def _watseg(ridges, mask, thresh_min_size):
+    
+        # Get seed mask
+        mask = remove_small_objects(mask, min_size=thresh_min_size) 
+        
+        # Get watershed 
+        markers = label(np.invert(mask), connectivity=1)  
+        labels = watershed(ridges, markers, compactness=1, watershed_line=True) 
+        wat = labels == 0
+            
+        # Process labels
+        labels = clear_border(labels)
+        temp_mask = binary_dilation(labels > 0)
+        temp_mask = remove_small_holes(temp_mask, area_threshold=2)
+        labels = expand_labels(labels, distance=2)
+        labels[temp_mask == 0] = 0
+          
+        # # Remove border cells    
+        # temp_mask = binary_erosion(labels > 0)    
+        # all_id = np.unique(labels)
+        # for cell_id in all_id:
+        #     idx = bd_where(labels, cell_id)    
+        #     if False in temp_mask[idx]:
+        #         labels[idx] = 0
+                           
+        # Remove isolated cells
+        temp_mask = labels > 0
+        temp_mask = remove_small_objects(temp_mask, min_size = thresh_min_size)
+        labels[temp_mask==0] = 0  
+        
+        # Clean wat & vertices
+        temp_mask = binary_dilation(labels > 0)
+        wat[temp_mask == 0] = 0
+         
+        return mask, markers, labels, wat
+    
+    # Main function -----------------------------------------------------------
     
     # Add one dimension (if ndim = 2)
     ndim = (ridges.ndim)        
