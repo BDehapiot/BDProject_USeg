@@ -199,18 +199,12 @@ print('test')
 # Get watershed 
 markers = label(np.invert(mask), connectivity=1)  
 labels = watershed(
-    ridges, markers, compactness=5, watershed_line=False
+    ridges, markers, compactness=10/binning, watershed_line=False
     ) 
 
-# Remove small cells
-if min_cell_size > 0:
-    
-    props = regionprops(labels)
-    for i, prop in enumerate(props):
-        if prop.area < min_cell_size:
-            labels[labels==i+1] = 0
-            
-    labels = expand_labels(labels, distance=min_cell_size)
+# # Remove small cells
+labels = remove_small_objects(labels, min_size=min_cell_size)
+labels = expand_labels(labels, distance=min_cell_size)
 
 # Remove border cells
 if remove_border_cells:
@@ -218,8 +212,8 @@ if remove_border_cells:
     
 # Get boundaries
 wat = find_boundaries(labels)
-wat = skeletonize(wat, method='zhang')
-labels = label(np.invert(wat), connectivity=1)
+# wat = skeletonize(wat, method='lee')
+# labels = label(np.invert(wat), connectivity=1)
 
 # Option #2 -------------------------------------------------------------------
 
