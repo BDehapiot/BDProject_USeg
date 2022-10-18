@@ -11,8 +11,15 @@ from skimage.filters import threshold_li
 from skimage.filters import sato, gaussian
 from skimage.restoration import rolling_ball
 from skimage.measure import label, regionprops
-from skimage.segmentation import watershed, clear_border, expand_labels, find_boundaries
-from skimage.morphology import remove_small_objects, binary_dilation, remove_small_holes, skeletonize
+from skimage.segmentation import watershed, clear_border
+from skimage.morphology import remove_small_objects, binary_dilation
+
+#%% To do list ----------------------------------------------------------------
+
+'''
+- Extract advanced parameters
+- Filter small and big cells using the same parameter
+'''
 
 #%% Function (get_wat) --------------------------------------------------------
 
@@ -67,13 +74,14 @@ def get_wat(
         # Remove border cells
         if remove_border_cells:
             labels = clear_border(labels)
-            
-        # Get wat & updated labels
+             
+        # Get wat & update labels
         wat = labels == 0
-        temp_wat = binary_dilation(wat == 0)
-        wat = np.invert(wat^temp_wat)
+        temp = binary_dilation(wat == 0) 
+        temp = remove_small_objects(temp, min_size=max_size*0.01) 
+        wat = wat*temp # Remove isolated cells
         labels = label(np.invert(wat), connectivity=1)
-                
+                        
         return rsize, ridges, mask, markers, labels, wat
     
     # Run ---------------------------------------------------------------------
@@ -128,15 +136,17 @@ def get_wat(
 
 # File name
 raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
+# raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
 # raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
+# raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
 # Parameters
 binning = 2
-ridge_size = 3
+ridge_size = 2
 thresh_coeff = 0.5
 min_cell_size = 25
-remove_border_cells = True
+remove_border_cells = False
 
 # Open data
 raw = io.imread(Path('../data/', raw_name))
@@ -151,7 +161,7 @@ output_dict = get_wat(
     ridge_size, 
     thresh_coeff, 
     min_cell_size,
-    remove_border_cells=True, 
+    remove_border_cells=remove_border_cells, 
     parallel=True
     )
 
@@ -171,23 +181,17 @@ viewer.grid.enabled = True
 
 #%% Tests ---------------------------------------------------------------------
 
-# rsize = output_dict['rsize']
-# ridges = output_dict['ridges']
-# mask = output_dict['mask']
-# markers = output_dict['markers']
-# labels = output_dict['labels']
-# wat = output_dict['wat']
+# rsize = output_dict['rsize'][-1,...]
+# ridges = output_dict['ridges'][-1,...]
+# mask = output_dict['mask'][-1,...]
+# markers = output_dict['markers'][-1,...]
+# labels = output_dict['labels'][-1,...]
+# wat = output_dict['wat'][-1,...]
 
 # start = time.time()
 # print('test')
 
 # Option #1 -------------------------------------------------------------------
-
-# wat = labels == 0
-# temp_wat = wat == 0
-# temp_wat = binary_dilation(temp_wat)
-# wat = np.invert(wat^temp_wat)
-# wat = label(np.invert(wat), connectivity=1)
 
 # Option #2 -------------------------------------------------------------------
 
@@ -198,6 +202,5 @@ viewer.grid.enabled = True
 # viewer = napari.Viewer()
 # viewer.add_labels(markers)
 # viewer.add_labels(labels)
-# viewer.add_labels(wat)
-# viewer.add_image(temp_wat)
+# viewer.add_image(wat)
 # viewer.grid.enabled = True
