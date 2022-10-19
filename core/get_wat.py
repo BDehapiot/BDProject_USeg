@@ -150,9 +150,9 @@ def get_wat(
 # File name
 # raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
-# raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
+raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
-raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
+# raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
 # Parameters
 binning = 2
@@ -209,7 +209,7 @@ raw = io.imread(Path('../data/', raw_name))
 # labels = output_dict['labels'][t,...]
 # wat = output_dict['wat'][t,...]
 
-# raw = raw[-1,...]
+raw = raw[-1,...]
 
 # -----------------------------------------------------------------------------
 
@@ -262,7 +262,7 @@ print('Get mask & markers')
 thresh = threshold_li(ridges, tolerance=1)
 mask = ridges > thresh*thresh_coeff
 mask = remove_small_objects(mask, min_size=np.sum(mask)*0.01)
-markers = label(np.invert(mask), connectivity=1)  
+markers = label(np.invert(mask), connectivity=1)
 
 end = time.time()
 print(f'  {(end-start):5.3f} s')
@@ -289,7 +289,7 @@ print(f'  {(end-start):5.3f} s')
 # -----------------------------------------------------------------------------
 
 start = time.time()
-print('Get watershed labels & line')
+print('Get watershed labels')
 
 # Get watershed labels & line
 labels = watershed(
@@ -300,14 +300,23 @@ labels = watershed(
     ) 
 
 if remove_border_cells:
-    labels = clear_border(labels, bgval=np.max(labels)+1)
+    labels = clear_border(labels)
 
-line = labels == 0
-             
 end = time.time()
 print(f'  {(end-start):5.3f} s') 
 
 # -----------------------------------------------------------------------------
+
+start = time.time()
+print('Get watershed line')
+
+line = labels == 0
+temp = np.invert(line)
+temp = binary_dilation(temp)
+line = np.minimum(line, temp)
+
+end = time.time()
+print(f'  {(end-start):5.3f} s') 
 
 # -----------------------------------------------------------------------------
 
