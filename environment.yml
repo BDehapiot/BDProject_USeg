@@ -9,6 +9,7 @@ dependencies:
     - pyqt=5.12.3
     - pip
     - numpy
+    - pandas
     - scipy
     - scikit-image
     - matplotlib-base
