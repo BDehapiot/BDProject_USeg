@@ -1,5 +1,6 @@
 #%% Imports -------------------------------------------------------------------
 
+import time
 import napari
 import numpy as np
 from skimage import io
@@ -9,12 +10,22 @@ from skimage.transform import resize
 
 from get_wat import get_wat
 
+#%% To do list ----------------------------------------------------------------
+
+'''
+- FileEdit to load images
+- Progress bar during process, estimated time ?
+- See, process and save intermediate steps (rsize, ridges, mask, labels...)
+- add info about shortcuts with 'viewer.text_overlay'
+
+'''
+
 #%% Open data -----------------------------------------------------------------
 
 # File name
-raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
+# raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
-# raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
+raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
 # raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
@@ -48,7 +59,7 @@ def display_wat(raw):
     
     @magicgui(
         
-        auto_call = True,
+        auto_call = False,
                        
         frame = {
             'widget_type': 'SpinBox', 
@@ -60,7 +71,7 @@ def display_wat(raw):
         binning = {
             'widget_type': 'SpinBox', 
             'label': 'binning',
-            'min': 1, 'max': 4, 'step': 1,
+            'min': 1, 'max': 5, 'step': 1,
             'value': 2,
             },
         
@@ -104,6 +115,11 @@ def display_wat(raw):
             'value': False, 
             },
         
+        process = {
+            'widget_type': 'PushButton',
+            'label': 'process and save',
+            }
+                
         )
 
     def display(
@@ -115,6 +131,7 @@ def display_wat(raw):
             large_cell_cutoff: int,
             remove_border_cells: bool,           
             preview: bool,
+            process: bool,
             ):
         
         # Get info
@@ -122,20 +139,11 @@ def display_wat(raw):
         viewer.text_overlay.visible = True
         viewer.text_overlay.text = f'frame = {t}'
                 
-        # Show raw image 
         if not preview:
-            
-            if viewer.layers.__contains__('raw'):               
-                viewer.layers['raw'].data = raw[t,...]
-                
-            else:
-                
-                if viewer.layers.__contains__('rsize'): 
-                    viewer.layers.remove('rsize') 
-                
-                if viewer.layers.__contains__('wat'): 
-                    viewer.layers.remove('wat') 
-                
+     
+            # Initialize raw display
+            if not viewer.layers.__contains__('raw'): 
+               
                 viewer.add_image(
                     raw[t,...], 
                     name='raw',
@@ -147,10 +155,63 @@ def display_wat(raw):
                     )
                                 
                 viewer.reset_view()
+            
+            # Update raw display (preview off)
+            else:
+                viewer.layers['raw'].data = raw[t,...]
+                viewer.layers['raw'].opacity = 1
+
+            if viewer.layers.__contains__('wat'): 
+                viewer.layers.remove('wat') 
                 
         else:
             
-            # Get wat preview            
+            # Update raw display (preview on)
+            viewer.layers['raw'].data = raw[t,...]
+            viewer.layers['raw'].opacity = 0.66
+            
+            # Get wat (one frame)       
+            output_dict = get_wat(
+                raw[t,...], 
+                binning, 
+                ridge_size, 
+                thresh_coeff, 
+                small_cell_cutoff,
+                large_cell_cutoff,
+                remove_border_cells=remove_border_cells, 
+                parallel=False
+                )
+            
+            # Process wat for display
+            wat = output_dict['wat']
+            watsize = resize(wat, (            
+                int(wat.shape[0]*binning), 
+                int(wat.shape[1]*binning)),
+                preserve_range=True, 
+                )   
+            
+            # Initialize wat display
+            if not viewer.layers.__contains__('wat'): 
+                
+                viewer.add_image(
+                    watsize, 
+                    name='wat',
+                    colormap='red',
+                    contrast_limits=(0, 1),
+                    blending='additive',
+                    )
+                
+            # Update wat display    
+            else:
+                viewer.layers['wat'].data = watsize
+                
+        @display.process.changed.connect
+        def process_callback():
+            
+            start = time.time()
+            print('get_wat')
+            
+            # Get wat (all frames)          
             output_dict = get_wat(
                 raw, 
                 binning, 
@@ -162,28 +223,39 @@ def display_wat(raw):
                 parallel=True
                 )
             
-            # Back size wat for display
-            wat = output_dict['wat']
-            watsize = resize(wat, (            
-                int(wat.shape[0]*binning), 
-                int(wat.shape[1]*binning)),
-                preserve_range=True, 
-                anti_aliasing=True,
-                )    
+            end = time.time()
+            print(f'  {(end-start):5.3f} s')
             
-            if viewer.layers.__contains__('wat'): 
-                viewer.layers['wat'].data = watsize
-                
-            else:
-                viewer.add_image(
-                    watsize, 
-                    name='wat',
-                    colormap='red',
-                    contrast_limits=(0, 1),
-                    blending='additive',
-                    )
+            # Save wat
+            io.imsave(
+                Path('../data/', raw_name.replace('.tif', '_wat.tif')),
+                output_dict['wat'].astype('uint8')*255,
+                check_contrast=False,
+                )
 
     viewer.window.add_dock_widget(display, area='right', name='widget')
+    
+#%% Shortcuts
+
+    @viewer.bind_key('Right')
+    def next_frame(viewer):
+                
+        if display.frame.value < raw.shape[0]-1:
+            display.frame.value += 1
+            
+    @viewer.bind_key('Left')
+    def previous_frame(viewer):
+
+        if display.frame.value > 0:
+            display.frame.value -= 1   
+            
+    @viewer.bind_key('p', overwrite=True)
+    def hide_wat(viewer):
+
+        if viewer.layers.__contains__('wat'): 
+            viewer.layers['wat'].visible = False
+            yield
+            viewer.layers['wat'].visible = True
     
 #%% Run -----------------------------------------------------------------------
 

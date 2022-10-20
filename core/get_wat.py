@@ -18,8 +18,10 @@ from skimage.morphology import binary_dilation, remove_small_objects
 #%% To do list ----------------------------------------------------------------
 
 '''
+- Handle bit depth (convert to uint8)
 - Extract advanced parameters
 - Get an auto ridge_size
+- back size wat as an option
 
 '''
 
@@ -117,7 +119,7 @@ def get_wat(
     if parallel:
     
         # Run parallel
-        output_list = Parallel(n_jobs=-1)(
+        output_list = Parallel(n_jobs=-2)(
             delayed(_get_wat)(
                 img,
                 )
