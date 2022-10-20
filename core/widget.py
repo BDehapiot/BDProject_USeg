@@ -25,8 +25,8 @@ from get_wat import get_wat
 # File name
 # raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
-raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
-# raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
+# raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
+raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
 # raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
@@ -40,7 +40,7 @@ if ndim == 2:
 
 #%% Initialize ----------------------------------------------------------------
 
-def display_wat(raw):
+def widget(raw):
     
     class Viewer(napari.Viewer):
         pass
@@ -57,9 +57,11 @@ def display_wat(raw):
             ),
         )
     
+#%% Display -------------------------------------------------------------------
+    
     @magicgui(
         
-        auto_call = False,
+        auto_call = True,
                        
         frame = {
             'widget_type': 'SpinBox', 
@@ -93,7 +95,7 @@ def display_wat(raw):
             'widget_type': 'SpinBox', 
             'label': 'small cell cutoff',
             'min': 1, 'max': 20, 'step': 1,
-            'value': 5,
+            'value': 10,
             },
 
         large_cell_cutoff = {
@@ -114,11 +116,6 @@ def display_wat(raw):
             'label': 'preview',
             'value': False, 
             },
-        
-        process = {
-            'widget_type': 'PushButton',
-            'label': 'process and save',
-            }
                 
         )
 
@@ -131,7 +128,6 @@ def display_wat(raw):
             large_cell_cutoff: int,
             remove_border_cells: bool,           
             preview: bool,
-            process: bool,
             ):
         
         # Get info
@@ -205,37 +201,43 @@ def display_wat(raw):
             else:
                 viewer.layers['wat'].data = watsize
                 
-        @display.process.changed.connect
-        def process_callback():
-            
-            start = time.time()
-            print('get_wat')
-            
-            # Get wat (all frames)          
-            output_dict = get_wat(
-                raw, 
-                binning, 
-                ridge_size, 
-                thresh_coeff, 
-                small_cell_cutoff,
-                large_cell_cutoff,
-                remove_border_cells=remove_border_cells, 
-                parallel=True
-                )
-            
-            end = time.time()
-            print(f'  {(end-start):5.3f} s')
-            
-            # Save wat
-            io.imsave(
-                Path('../data/', raw_name.replace('.tif', '_wat.tif')),
-                output_dict['wat'].astype('uint8')*255,
-                check_contrast=False,
-                )
+#%% Process
 
-    viewer.window.add_dock_widget(display, area='right', name='widget')
+    @magicgui(
+        
+        auto_call = False,
+        call_button="Process and save",
+        
+        )
+
+    def process():
+        
+        start = time.time()
+        print('get_wat')
+        
+        # Get wat (all frames)          
+        output_dict = get_wat(
+            raw, 
+            display.binning.value, 
+            display.ridge_size.value, 
+            display.thresh_coeff.value, 
+            display.small_cell_cutoff.value,
+            display.large_cell_cutoff.value,
+            display.remove_border_cells.value, 
+            parallel=True
+            )
+        
+        end = time.time()
+        print(f'  {(end-start):5.3f} s')
+        
+        # Save wat
+        io.imsave(
+            Path('../data/', raw_name.replace('.tif', '_wat.tif')),
+            output_dict['wat'].astype('uint8')*255,
+            check_contrast=False,
+            )
     
-#%% Shortcuts
+#%% Shortcuts -----------------------------------------------------------------
 
     @viewer.bind_key('Right')
     def next_frame(viewer):
@@ -256,8 +258,16 @@ def display_wat(raw):
             viewer.layers['wat'].visible = False
             yield
             viewer.layers['wat'].visible = True
+            
+#%% Add dock widget -----------------------------------------------------------
     
+    viewer.window.add_dock_widget(
+        [display, process], 
+        area='right', 
+        name='widget'
+        )
+
 #%% Run -----------------------------------------------------------------------
 
-display_wat(raw)
+widget(raw)
              
