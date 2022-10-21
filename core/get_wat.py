@@ -155,7 +155,7 @@ def get_wat(
 
 #%% Run -----------------------------------------------------------------------
 
-# File name
+# # File name
 # raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
 # raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
@@ -166,7 +166,7 @@ def get_wat(
 # # Parameters
 # binning = 2
 # ridge_size = 3
-# thresh_coeff = 0.75
+# thresh_coeff = 0.5
 # small_cell_cutoff = 10
 # large_cell_cutoff = 10
 # remove_border_cells = False
@@ -213,4 +213,20 @@ def get_wat(
 #     output_dict['wat'],
 #     colormap='red',
 #     blending='additive',
+#     )
+
+#%% Save ----------------------------------------------------------------------
+
+# # Save rsize
+# io.imsave(
+#     Path('../data/', raw_name.replace('.tif', '_rsize.tif')),
+#     output_dict['rsize'].astype('uint8'),
+#     check_contrast=False,
+#     )
+
+# # Save wat
+# io.imsave(
+#     Path('../data/', raw_name.replace('.tif', '_wat.tif')),
+#     output_dict['wat'].astype('uint8')*255,
+#     check_contrast=False,
 #     )

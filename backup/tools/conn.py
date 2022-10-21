@@ -133,11 +133,6 @@ def labconn(img, labels=None, conn=2):
     all_kernels.sort(axis=1)  
     img_labconn[idx_t,idx_y,idx_x] = (np.diff(all_kernels) > 0).sum(axis=1)+1
         
-    # for i in range(len(all_kernels)):
-    #     kernel = all_kernels[i,...].ravel()
-    #     kernel = kernel[~np.isnan(kernel)]
-    #     img_labconn[idx_t[i],idx_y[i],idx_x[i]] = len(np.unique(kernel))
-        
     # Remove one dimension (if ndim = 2)    
     if ndim == 2:
         img_labconn = img_labconn.squeeze()
