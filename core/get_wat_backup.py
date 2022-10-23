@@ -8,14 +8,12 @@ from skimage import io
 from pathlib import Path
 from joblib import Parallel, delayed 
 from skimage.transform import resize
+from skimage.filters import threshold_li
+from skimage.filters import sato, gaussian
 from skimage.restoration import rolling_ball
 from skimage.measure import label, regionprops
 from skimage.segmentation import watershed, clear_border
-from skimage.filters import sato, threshold_li, gaussian
-from skimage.morphology import binary_dilation, remove_small_objects, square
-
-from tools.conn import labconn
-from tools.nan import nanreplace
+from skimage.morphology import binary_dilation, remove_small_objects
 
 #%% To do list ----------------------------------------------------------------
 
@@ -27,7 +25,7 @@ from tools.nan import nanreplace
 
 '''
 
-#%% Function (get_bounds) --------------------------------------------------------
+#%% Function (get_wat) --------------------------------------------------------
 
 def get_wat(
         raw, 
@@ -76,15 +74,13 @@ def get_wat(
             )
         median = np.median(info['area'])
         for i in range(len(info)):
-            
-            # Detect & remove small cells
-            if info.loc[i, 'area'] < median/small_cell_cutoff: 
-                info.loc[i, 'valid'] = 1
+            # Remove small cells
+            if info['area'][i] < median/small_cell_cutoff: 
+                info['valid'][i] = 1
                 markers[markers==info['idx'][i]] = 0  
-            
-            # Detect large cells
-            if info.loc[i, 'area'] > median*large_cell_cutoff: 
-                info.loc[i, 'valid'] = 2                
+            # Remove large cells
+            if info['area'][i] > median*large_cell_cutoff: 
+                info['valid'][i] = 2
                 
         # Get watershed labels
         labels = watershed(
@@ -108,26 +104,7 @@ def get_wat(
         temp = binary_dilation(temp)
         wat = np.minimum(wat, temp)
         
-        # Get vertices
-        vertices = labconn(wat, labels=labels, conn=2) > 2
-        
-        # Get bounds & endpoints
-        bounds = wat.copy()
-        bounds[binary_dilation(vertices, square(3)) == 1] = 0
-        endpoints = wat ^ bounds ^ vertices
-        
-        # Label bounds
-        bound_labels = label(bounds, connectivity=2).astype('float')
-        bound_labels[endpoints == 1] = np.nan
-        bound_labels = nanreplace(bound_labels, 3, 'max')
-        bound_labels = bound_labels.astype('int')
-        small_bounds = wat ^ (bound_labels > 0) ^ vertices
-        small_bound_labels = label(small_bounds, connectivity=2)
-        small_bound_labels = small_bound_labels + np.max(bound_labels)
-        small_bound_labels[small_bound_labels == np.max(bound_labels)] = 0
-        bound_labels = bound_labels + small_bound_labels
-        
-        return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels
+        return rsize, ridges, mask, markers, labels, wat
     
     # Main function -----------------------------------------------------------
     
@@ -172,126 +149,53 @@ def get_wat(
             [img[4] for img in output_list], axis=0).squeeze(),
         'wat':np.stack(
             [img[5] for img in output_list], axis=0).squeeze(),
-        'vertices':np.stack(
-            [img[6] for img in output_list], axis=0).squeeze(),
-        'bound_labels':np.stack(
-            [img[7] for img in output_list], axis=0).squeeze(),
         }
     
     return output_dict
 
-#%% Function (filt_bounds) --------------------------------------------------------
-
-
 #%% Run -----------------------------------------------------------------------
 
-# File name
-raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
+# # File name
+# raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
 # raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
 # raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
-# Parameters
-binning = 2
-ridge_size = 2
-thresh_coeff = 0.5
-small_cell_cutoff = 3
-large_cell_cutoff = 10
-remove_border_cells = False
+# # Parameters
+# binning = 2
+# ridge_size = 3
+# thresh_coeff = 0.5
+# small_cell_cutoff = 10
+# large_cell_cutoff = 10
+# remove_border_cells = False
 
-# Open data
-raw = io.imread(Path('../data/', raw_name))
+# # Open data
+# raw = io.imread(Path('../data/', raw_name))
 
-# Process data (get_wat)
-start = time.time()
-print('get_wat')
+# # Process data (get_wat)
+# start = time.time()
+# print('get_wat')
 
-output_dict = get_wat(
-    raw, 
-    binning, 
-    ridge_size, 
-    thresh_coeff, 
-    small_cell_cutoff,
-    large_cell_cutoff,
-    remove_border_cells=remove_border_cells, 
-    parallel=True
-    )
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
-
-#%% Test ----------------------------------------------------------------------
-
-rsize = output_dict['rsize'][0]
-mask = output_dict['mask'][0]
-bound_labels = output_dict['bound_labels'][0]
-
-start = time.time()
-print('Get rsize background')
-
-# Get rsize background
-rsize_bg = rsize.copy().astype('float')
-rsize_bg[mask==1] = np.nan
-rsize_bg = nanreplace(rsize_bg, (ridge_size*2)+1, 'mean')
-rsize_bg = nanreplace(rsize_bg, (ridge_size*2)+1, 'mean')
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
-
-# -----------------------------------------------------------------------------
-
-start = time.time()
-print('Mesure bound intensities')
-
-# Mesure bound intensities
-props = regionprops(
-    bound_labels, 
-    intensity_image=(gaussian(rsize, ridge_size))
-    )
-props_bg = regionprops(
-    bound_labels, 
-    intensity_image=(gaussian(rsize_bg, ridge_size))
-    )
-
-
-
-info = pd.DataFrame(
-    ([(i.label, i.intensity_mean) for i in props],
-     [(i.intensity_mean) for i in props_bg]),
-    columns = ['idx', 'bound', 'bg']
-    )
-
-# info = pd.concat([info, info_bg], axis=1)
-# info['ratio'] = info['bound']/info['bg'] 
-
-# bound_ratio = np.zeros_like(rsize)
-# for idx, ratio in zip(info['idx'], info['ratio']):
-#     bound_ratio[bound_labels==idx] = ratio
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
-
-# viewer = napari.Viewer()
-# viewer.add_image(rsize)
-# viewer.add_image(bound_ratio, blending='additive',)
-# viewer.add_image(
-#     gaussian(rsize_bg, ridge_size),
-#     contrast_limits=(0,50)
-#     )
-# viewer.add_image(
-#     gaussian(rsize, ridge_size),
-#     contrast_limits=(0,50)
+# output_dict = get_wat(
+#     raw, 
+#     binning, 
+#     ridge_size, 
+#     thresh_coeff, 
+#     small_cell_cutoff,
+#     large_cell_cutoff,
+#     remove_border_cells=remove_border_cells, 
+#     parallel=True
 #     )
 
+# end = time.time()
+# print(f'  {(end-start):5.3f} s')
 
 #%% Display -------------------------------------------------------------------
 
 # # All
 # viewer = napari.Viewer()
-# viewer.add_labels(output_dict['bound_labels'])
-# viewer.add_image(output_dict['vertices'])
 # viewer.add_image(output_dict['wat'])
 # viewer.add_labels(output_dict['labels'])
 # viewer.add_labels(output_dict['markers'])

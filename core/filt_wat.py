@@ -6,12 +6,13 @@ import numpy as np
 import pandas as pd
 from skimage import io
 from pathlib import Path
+from skimage.filters import gaussian
 from skimage.measure import label, regionprops
 from skimage.segmentation import expand_labels
-from skimage.morphology import binary_dilation, square 
+from skimage.morphology import binary_dilation, square, disk
 
 from tools.conn import labconn
-from tools.nan import nanreplace
+from tools.nan import nanreplace, nanoutliers
 
 #%% To do list ----------------------------------------------------------------
 
@@ -114,21 +115,31 @@ print(f'  {(end-start):5.3f} s')
 start = time.time()
 print('Get bound info ')
 
-expanded_bound_labels = expand_labels(bound_labels, distance=1)
+rsize_bg = rsize.copy().astype('float')
+rsize_bg[binary_dilation(wat, footprint=disk(2))!=0] = np.nan
+# rsize_bg = nanreplace(rsize_bg, 7, 'mean')
+# rsize_bg = gaussian(rsize_bg, 2)
 
-def std(region, intensities):
-    return np.std(intensities[region], ddof=1)
+# rsize_bg[expanded_bound_labels!=0] = np.nan
+# rsize_bg = nanoutliers(rsize_bg, 3, 'mean', sd_thresh=1)
+# rsize_bg = nanreplace(rsize_bg, 5, 'mean')
 
-props = regionprops(
-    expanded_bound_labels,
-    intensity_image=rsize,
-    extra_properties=[std]
-    )
 
-info = pd.DataFrame(
-    ([(i.label, i.area, i.intensity_mean, i.std) for i in props]),
-    columns = ['label', 'area', 'mean', 'std']
-    )
+# expanded_bound_labels = expand_labels(bound_labels, distance=1)
+
+# def std(region, intensities):
+#     return np.std(intensities[region], ddof=1)
+
+# props = regionprops(
+#     expanded_bound_labels,
+#     intensity_image=rsize,
+#     extra_properties=[std]
+#     )
+
+# info = pd.DataFrame(
+#     ([(i.label, i.area, i.intensity_mean, i.std) for i in props]),
+#     columns = ['label', 'area', 'mean', 'std']
+#     )
 
 end = time.time()
 print(f'  {(end-start):5.3f} s')
@@ -147,6 +158,6 @@ print(f'  {(end-start):5.3f} s')
 # viewer.add_labels(bound_labels)
 # viewer.add_labels(small_bound_labels)
 
-# Expanded bound labels
+# Current
 viewer = napari.Viewer()
-viewer.add_labels(expanded_bound_labels)
+viewer.add_image(rsize_bg)
