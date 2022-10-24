@@ -70,21 +70,21 @@ def get_wat(
         
         # Filter cells (according to area)
         props = regionprops(markers)
-        info = pd.DataFrame(
+        cell_info = pd.DataFrame(
             ([(i.label, i.area, 0) for i in props]),
             columns = ['idx', 'area', 'valid']
             )
-        median = np.median(info['area'])
-        for i in range(len(info)):
+        median = np.median(cell_info['area'])
+        for i in range(len(cell_info)):
             
             # Detect & remove small cells
-            if info.loc[i, 'area'] < median/small_cell_cutoff: 
-                info.loc[i, 'valid'] = 1
-                markers[markers==info['idx'][i]] = 0  
+            if cell_info.loc[i, 'area'] < median/small_cell_cutoff: 
+                cell_info.loc[i, 'valid'] = 1
+                markers[markers==cell_info['idx'][i]] = 0  
             
             # Detect large cells
-            if info.loc[i, 'area'] > median*large_cell_cutoff: 
-                info.loc[i, 'valid'] = 2                
+            if cell_info.loc[i, 'area'] > median*large_cell_cutoff: 
+                cell_info.loc[i, 'valid'] = 2                
                 
         # Get watershed labels
         labels = watershed(
@@ -95,7 +95,7 @@ def get_wat(
             ) 
 
         # Remove large cells
-        for idx in info.loc[info['valid'] == 2, 'idx']:
+        for idx in cell_info.loc[cell_info['valid'] == 2, 'idx']:
             labels[labels==idx] = 0  
 
         # Remove border cells
@@ -126,6 +126,37 @@ def get_wat(
         small_bound_labels = small_bound_labels + np.max(bound_labels)
         small_bound_labels[small_bound_labels == np.max(bound_labels)] = 0
         bound_labels = bound_labels + small_bound_labels
+        
+        # Get background
+        rsize_bg = rsize.copy().astype('float')
+        rsize_bg[mask==1] = np.nan
+        
+        rsize_bg = nanreplace(
+            rsize_bg, int(np.ceil(ridge_size)//2*2+1), 'mean')
+        rsize_bg = nanreplace(
+            rsize_bg, int(np.ceil(ridge_size)//2*2+1), 'mean')
+        
+        
+        # rsize_bg = nanreplace(rsize_bg, (ridge_size*2)+1, 'mean')
+        # rsize_bg = nanreplace(rsize_bg, (ridge_size*2)+1, 'mean')
+        
+        # test = int(np.ceil(ridge_size)//2*2+1) 
+        
+        # # Get bound intensities
+        # props = regionprops(
+        #     bound_labels, 
+        #     intensity_image=(gaussian(rsize, ridge_size))
+        #     )
+        # props_bg = regionprops(
+        #     bound_labels, 
+        #     intensity_image=(gaussian(rsize_bg, ridge_size))
+        #     )
+        # bound_info = pd.DataFrame(([
+        #     (i.label, i.intensity_mean, j.intensity_mean) 
+        #     for i, j in zip(props, props_bg)]),
+        #     columns = ['idx', 'bound', 'bg'],
+        #     )
+        # bound_info['ratio'] = bound_info['bound']/bound_info['bg'] 
         
         return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels
     
@@ -223,68 +254,6 @@ end = time.time()
 print(f'  {(end-start):5.3f} s')
 
 #%% Test ----------------------------------------------------------------------
-
-rsize = output_dict['rsize'][0]
-mask = output_dict['mask'][0]
-bound_labels = output_dict['bound_labels'][0]
-
-start = time.time()
-print('Get rsize background')
-
-# Get rsize background
-rsize_bg = rsize.copy().astype('float')
-rsize_bg[mask==1] = np.nan
-rsize_bg = nanreplace(rsize_bg, (ridge_size*2)+1, 'mean')
-rsize_bg = nanreplace(rsize_bg, (ridge_size*2)+1, 'mean')
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
-
-# -----------------------------------------------------------------------------
-
-start = time.time()
-print('Mesure bound intensities')
-
-# Mesure bound intensities
-props = regionprops(
-    bound_labels, 
-    intensity_image=(gaussian(rsize, ridge_size))
-    )
-props_bg = regionprops(
-    bound_labels, 
-    intensity_image=(gaussian(rsize_bg, ridge_size))
-    )
-
-
-
-info = pd.DataFrame(
-    ([(i.label, i.intensity_mean) for i in props],
-     [(i.intensity_mean) for i in props_bg]),
-    columns = ['idx', 'bound', 'bg']
-    )
-
-# info = pd.concat([info, info_bg], axis=1)
-# info['ratio'] = info['bound']/info['bg'] 
-
-# bound_ratio = np.zeros_like(rsize)
-# for idx, ratio in zip(info['idx'], info['ratio']):
-#     bound_ratio[bound_labels==idx] = ratio
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
-
-# viewer = napari.Viewer()
-# viewer.add_image(rsize)
-# viewer.add_image(bound_ratio, blending='additive',)
-# viewer.add_image(
-#     gaussian(rsize_bg, ridge_size),
-#     contrast_limits=(0,50)
-#     )
-# viewer.add_image(
-#     gaussian(rsize, ridge_size),
-#     contrast_limits=(0,50)
-#     )
-
 
 #%% Display -------------------------------------------------------------------
 
