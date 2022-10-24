@@ -96,12 +96,19 @@ def get_wat(
 
         # Remove large cells
         for idx in cell_info.loc[cell_info['valid'] == 2, 'idx']:
-            labels[labels==idx] = 0  
-
+            labels[labels==idx] = 0
+            
         # Remove border cells
         if remove_border_cells:
             labels = clear_border(labels)
             
+        # Update cell info
+        props = regionprops(labels)
+        cell_info = pd.DataFrame(
+            ([(i.label, i.area) for i in props]),
+            columns = ['idx', 'area']
+            )
+
         # Get watershed wat
         wat = labels == 0
         temp = np.invert(wat)
@@ -129,36 +136,27 @@ def get_wat(
         
         # Get background
         rsize_bg = rsize.copy().astype('float')
-        rsize_bg[mask==1] = np.nan
-        
+        rsize_bg[mask==1] = np.nan        
         rsize_bg = nanreplace(
-            rsize_bg, int(np.ceil(ridge_size)//2*2+1), 'mean')
-        rsize_bg = nanreplace(
-            rsize_bg, int(np.ceil(ridge_size)//2*2+1), 'mean')
+            rsize_bg, int(np.ceil(ridge_size*4)//2*2+1), 'mean')
+
+        # Get bound intensities
+        props = regionprops(
+            bound_labels, 
+            intensity_image=(gaussian(rsize, ridge_size))
+            )
+        props_bg = regionprops(
+            bound_labels, 
+            intensity_image=(gaussian(rsize_bg, ridge_size))
+            )
+        bound_info = pd.DataFrame(([
+            (i.label, i.intensity_mean, j.intensity_mean) 
+            for i, j in zip(props, props_bg)]),
+            columns = ['idx', 'bound', 'bg'],
+            )
+        bound_info['ratio'] = bound_info['bound']/bound_info['bg'] 
         
-        
-        # rsize_bg = nanreplace(rsize_bg, (ridge_size*2)+1, 'mean')
-        # rsize_bg = nanreplace(rsize_bg, (ridge_size*2)+1, 'mean')
-        
-        # test = int(np.ceil(ridge_size)//2*2+1) 
-        
-        # # Get bound intensities
-        # props = regionprops(
-        #     bound_labels, 
-        #     intensity_image=(gaussian(rsize, ridge_size))
-        #     )
-        # props_bg = regionprops(
-        #     bound_labels, 
-        #     intensity_image=(gaussian(rsize_bg, ridge_size))
-        #     )
-        # bound_info = pd.DataFrame(([
-        #     (i.label, i.intensity_mean, j.intensity_mean) 
-        #     for i, j in zip(props, props_bg)]),
-        #     columns = ['idx', 'bound', 'bg'],
-        #     )
-        # bound_info['ratio'] = bound_info['bound']/bound_info['bg'] 
-        
-        return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels
+        return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels, cell_info, bound_info
     
     # Main function -----------------------------------------------------------
     
@@ -189,27 +187,27 @@ def get_wat(
             for img in raw
             ]
         
-    # Extract output dictionary
-    output_dict = {
-        'rsize': np.stack(
-            [img[0] for img in output_list], axis=0).squeeze(),
-        'ridges': np.stack(
-            [img[1] for img in output_list], axis=0).squeeze(),
-        'mask': np.stack(
-            [img[2] for img in output_list], axis=0).squeeze(),
-        'markers': np.stack(
-            [img[3] for img in output_list], axis=0).squeeze(),
-        'labels': np.stack(
-            [img[4] for img in output_list], axis=0).squeeze(),
-        'wat':np.stack(
-            [img[5] for img in output_list], axis=0).squeeze(),
-        'vertices':np.stack(
-            [img[6] for img in output_list], axis=0).squeeze(),
-        'bound_labels':np.stack(
-            [img[7] for img in output_list], axis=0).squeeze(),
-        }
-    
-    return output_dict
+    # # Extract output dictionary
+    # output_dict = {
+    #     'rsize': np.stack(
+    #         [img[0] for img in output_list], axis=0).squeeze(),
+    #     'ridges': np.stack(
+    #         [img[1] for img in output_list], axis=0).squeeze(),
+    #     'mask': np.stack(
+    #         [img[2] for img in output_list], axis=0).squeeze(),
+    #     'markers': np.stack(
+    #         [img[3] for img in output_list], axis=0).squeeze(),
+    #     'labels': np.stack(
+    #         [img[4] for img in output_list], axis=0).squeeze(),
+    #     'wat': np.stack(
+    #         [img[5] for img in output_list], axis=0).squeeze(),
+    #     'vertices': np.stack(
+    #         [img[6] for img in output_list], axis=0).squeeze(),
+    #     'bound_labels': np.stack(
+    #         [img[7] for img in output_list], axis=0).squeeze(),
+    #     }
+            
+    return output_list
 
 #%% Function (filt_bounds) --------------------------------------------------------
 
@@ -226,7 +224,7 @@ raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 
 # Parameters
 binning = 2
-ridge_size = 2
+ridge_size = 3
 thresh_coeff = 0.5
 small_cell_cutoff = 3
 large_cell_cutoff = 10
@@ -254,6 +252,9 @@ end = time.time()
 print(f'  {(end-start):5.3f} s')
 
 #%% Test ----------------------------------------------------------------------
+
+cell_info = pd.concat(
+    [(img[8]) for i, img in enumerate(output_dict)])
 
 #%% Display -------------------------------------------------------------------
 
