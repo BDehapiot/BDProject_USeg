@@ -42,7 +42,7 @@ def get_wat(
         
     # Nested function ---------------------------------------------------------
     
-    def _get_wat(raw):
+    def _get_wat(raw, frame):
         
         # Resize (according to binning)  
         rsize = resize(raw, (
@@ -71,20 +71,20 @@ def get_wat(
         # Filter cells (according to area)
         props = regionprops(markers)
         cell_info = pd.DataFrame(
-            ([(i.label, i.area, 0) for i in props]),
-            columns = ['idx', 'area', 'valid']
+            ([(frame, i.label, i.area, 0) for i in props]),
+            columns = ['frame', 'idx', 'area', 'valid']
             )
         median = np.median(cell_info['area'])
         for i in range(len(cell_info)):
             
             # Detect & remove small cells
-            if cell_info.loc[i, 'area'] < median/small_cell_cutoff: 
-                cell_info.loc[i, 'valid'] = 1
+            if cell_info.loc[i,'area'] < median/small_cell_cutoff: 
+                cell_info.loc[i,'valid'] = 1
                 markers[markers==cell_info['idx'][i]] = 0  
             
             # Detect large cells
-            if cell_info.loc[i, 'area'] > median*large_cell_cutoff: 
-                cell_info.loc[i, 'valid'] = 2                
+            if cell_info.loc[i,'area'] > median*large_cell_cutoff: 
+                cell_info.loc[i,'valid'] = 2                
                 
         # Get watershed labels
         labels = watershed(
@@ -105,8 +105,8 @@ def get_wat(
         # Update cell info
         props = regionprops(labels)
         cell_info = pd.DataFrame(
-            ([(i.label, i.area) for i in props]),
-            columns = ['idx', 'area']
+            ([(frame, i.label, i.area) for i in props]),
+            columns = ['frame', 'idx', 'area']
             )
 
         # Get watershed wat
@@ -150,11 +150,15 @@ def get_wat(
             intensity_image=(gaussian(rsize_bg, ridge_size))
             )
         bound_info = pd.DataFrame(([
-            (i.label, i.intensity_mean, j.intensity_mean) 
+            (frame, i.label, i.intensity_mean, j.intensity_mean) 
             for i, j in zip(props, props_bg)]),
-            columns = ['idx', 'bound', 'bg'],
+            columns = ['frame', 'idx', 'bound', 'bg'],
             )
         bound_info['ratio'] = bound_info['bound']/bound_info['bg'] 
+        
+        # Test
+        bound_ratio = np.zeros_like(rsize)
+        
         
         return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels, cell_info, bound_info
     
@@ -173,41 +177,45 @@ def get_wat(
         # Run parallel
         output_list = Parallel(n_jobs=-2)(
             delayed(_get_wat)(
-                img,
+                img, frame,
                 )
-            for img in raw
+            for frame, img in enumerate(raw)
             )
         
     else:
         
         # Run serial
         output_list = [_get_wat(
-                img,
+                img, frame,
                 )
-            for img in raw
+            for frame, img in enumerate(raw)
             ]
         
-    # # Extract output dictionary
-    # output_dict = {
-    #     'rsize': np.stack(
-    #         [img[0] for img in output_list], axis=0).squeeze(),
-    #     'ridges': np.stack(
-    #         [img[1] for img in output_list], axis=0).squeeze(),
-    #     'mask': np.stack(
-    #         [img[2] for img in output_list], axis=0).squeeze(),
-    #     'markers': np.stack(
-    #         [img[3] for img in output_list], axis=0).squeeze(),
-    #     'labels': np.stack(
-    #         [img[4] for img in output_list], axis=0).squeeze(),
-    #     'wat': np.stack(
-    #         [img[5] for img in output_list], axis=0).squeeze(),
-    #     'vertices': np.stack(
-    #         [img[6] for img in output_list], axis=0).squeeze(),
-    #     'bound_labels': np.stack(
-    #         [img[7] for img in output_list], axis=0).squeeze(),
-    #     }
+    # Extract output dictionary
+    output_dict = {
+        'rsize': np.stack(
+            [data[0] for data in output_list], axis=0).squeeze(),
+        'ridges': np.stack(
+            [data[1] for data in output_list], axis=0).squeeze(),
+        'mask': np.stack(
+            [data[2] for data in output_list], axis=0).squeeze(),
+        'markers': np.stack(
+            [data[3] for data in output_list], axis=0).squeeze(),
+        'labels': np.stack(
+            [data[4] for data in output_list], axis=0).squeeze(),
+        'wat': np.stack(
+            [data[5] for data in output_list], axis=0).squeeze(),
+        'vertices': np.stack(
+            [data[6] for data in output_list], axis=0).squeeze(),
+        'bound_labels': np.stack(
+            [data[7] for data in output_list], axis=0).squeeze(),
+        'cell_info' : pd.concat(
+            [(data[8]) for i, data in enumerate(output_list)]),
+        'bound_info' : pd.concat(
+            [(data[9]) for i, data in enumerate(output_list)]),        
+        }
             
-    return output_list
+    return output_dict
 
 #%% Function (filt_bounds) --------------------------------------------------------
 
@@ -253,8 +261,15 @@ print(f'  {(end-start):5.3f} s')
 
 #%% Test ----------------------------------------------------------------------
 
-cell_info = pd.concat(
-    [(img[8]) for i, img in enumerate(output_dict)])
+# start = time.time()
+# print('filt_wat')
+
+# bound_info = output_dict['bound_info']
+# bound_ratio_cutoff = 2.0
+# test = bound_info.loc[bound_info['ratio'] <= 2, ['frame', 'idx', 'ratio']]
+
+# end = time.time()
+# print(f'  {(end-start):5.3f} s')
 
 #%% Display -------------------------------------------------------------------
 
