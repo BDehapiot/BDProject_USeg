@@ -12,7 +12,7 @@ from skimage.restoration import rolling_ball
 from skimage.measure import label, regionprops
 from skimage.segmentation import watershed, clear_border
 from skimage.filters import sato, threshold_li, gaussian
-from skimage.morphology import binary_dilation, remove_small_objects, square
+from skimage.morphology import binary_dilation, remove_small_objects, square, disk
 
 from tools.conn import labconn
 from tools.nan import nanreplace
@@ -134,33 +134,29 @@ def get_wat(
         small_bound_labels[small_bound_labels == np.max(bound_labels)] = 0
         bound_labels = bound_labels + small_bound_labels
         
-        # Get background
-        rsize_bg = rsize.copy().astype('float')
-        rsize_bg[mask==1] = np.nan        
-        rsize_bg = nanreplace(
-            rsize_bg, int(np.ceil(ridge_size*4)//2*2+1), 'mean')
+        # # Get background
+        # rsize_bg = rsize.copy().astype('float')
+        # rsize_bg[mask==1] = np.nan        
+        # rsize_bg = nanreplace(
+        #     rsize_bg, int(np.ceil(ridge_size*4)//2*2+1), 'mean')
 
-        # Get bound intensities
-        props = regionprops(
-            bound_labels, 
-            intensity_image=(gaussian(rsize, ridge_size))
-            )
-        props_bg = regionprops(
-            bound_labels, 
-            intensity_image=(gaussian(rsize_bg, ridge_size))
-            )
-        bound_info = pd.DataFrame(([
-            (frame, i.label, i.intensity_mean, j.intensity_mean) 
-            for i, j in zip(props, props_bg)]),
-            columns = ['frame', 'idx', 'bound', 'bg'],
-            )
-        bound_info['ratio'] = bound_info['bound']/bound_info['bg'] 
+        # # Get bound intensities
+        # props_sig = regionprops(
+        #     bound_labels, 
+        #     intensity_image=(gaussian(rsize, ridge_size))
+        #     )
+        # props_bg = regionprops(
+        #     bound_labels, 
+        #     intensity_image=(gaussian(rsize_bg, ridge_size))
+        #     )
+        # bound_info = pd.DataFrame(([
+        #     (frame, i.label, i.intensity_mean, j.intensity_mean) 
+        #     for i, j in zip(props_sig, props_bg)]),
+        #     columns = ['frame', 'idx', 'bound', 'bg'],
+        #     )
+        # bound_info['ratio'] = bound_info['bound']/bound_info['bg']        
         
-        # Test
-        bound_ratio = np.zeros_like(rsize)
-        
-        
-        return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels, cell_info, bound_info
+        return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels #, cell_info, bound_info
     
     # Main function -----------------------------------------------------------
     
@@ -168,9 +164,6 @@ def get_wat(
     ndim = (raw.ndim)        
     if ndim == 2:
         raw = raw.reshape((1, raw.shape[0], raw.shape[1]))  
-        
-    # Adjust parameters according to binning
-    ridge_size = ridge_size/binning
     
     if parallel:
     
@@ -209,16 +202,13 @@ def get_wat(
             [data[6] for data in output_list], axis=0).squeeze(),
         'bound_labels': np.stack(
             [data[7] for data in output_list], axis=0).squeeze(),
-        'cell_info' : pd.concat(
-            [(data[8]) for i, data in enumerate(output_list)]),
-        'bound_info' : pd.concat(
-            [(data[9]) for i, data in enumerate(output_list)]),        
+        # 'cell_info' : pd.concat(
+        #     [(data[8]) for i, data in enumerate(output_list)]),
+        # 'bound_info' : pd.concat(
+        #     [(data[9]) for i, data in enumerate(output_list)]),        
         }
             
     return output_dict
-
-#%% Function (filt_bounds) --------------------------------------------------------
-
 
 #%% Run -----------------------------------------------------------------------
 
@@ -227,12 +217,13 @@ raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
 # raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
+# raw_name = 'Disc_Fixed_118hAEL_disc04_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
 # raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
 # Parameters
 binning = 2
-ridge_size = 3
+ridge_size = 4/binning
 thresh_coeff = 0.5
 small_cell_cutoff = 3
 large_cell_cutoff = 10
@@ -261,15 +252,107 @@ print(f'  {(end-start):5.3f} s')
 
 #%% Test ----------------------------------------------------------------------
 
-# start = time.time()
-# print('filt_wat')
+# rsize = output_dict['rsize']
+# mask = output_dict['mask']
+# labels = output_dict['labels']
+# bound_labels = output_dict['bound_labels']
 
-# bound_info = output_dict['bound_info']
-# bound_ratio_cutoff = 2.0
-# test = bound_info.loc[bound_info['ratio'] <= 2, ['frame', 'idx', 'ratio']]
+rsize = output_dict['rsize'][0]
+mask = output_dict['mask'][0]
+labels = output_dict['labels'][0]
+bound_labels = output_dict['bound_labels'][0]
+
+# -----------------------------------------------------------------------------
+
+start = time.time()
+print('Get background')
+
+# Get background
+background = rsize.copy()
+background[mask==1] = np.nan        
+background = nanreplace(
+    background, int(np.ceil(ridge_size*2)//2*2+1), 'mean')
+background = nanreplace(
+    background, int(np.ceil(ridge_size*2)//2*2+1), 'mean')
+
+rsize_norm = rsize-gaussian(background, sigma=ridge_size)
+
+end = time.time()
+print(f'  {(end-start):5.3f} s')
+
+viewer = napari.Viewer()
+viewer.add_image(rsize, contrast_limits=(-10,150))
+viewer.add_image(background, contrast_limits=(-10,150))
+viewer.add_image(rsize_norm)
+
+# -----------------------------------------------------------------------------
+
+# start = time.time()
+# print('Get norm. rsize')
+
+# # Get temp_mask
+# temp_mask = labels > 0
+# temp_mask = binary_dilation(
+#     temp_mask, footprint=disk(ridge_size)
+#     )
+
+# # viewer = napari.Viewer()
+# # viewer.add_image(temp_mask)
+
+# # Get bg_blur (with a nan ignoring Gaussian blur)
+# temp1 = rsize.astype('float')
+# temp1[temp_mask == 0] = np.nan
+# temp2 = temp1.copy()
+# temp2[np.isnan(temp2)] = 0
+# temp2_blur = gaussian(temp2, sigma=ridge_size*5) # 
+# temp3 = 0 * temp1.copy() + 1
+# temp3[np.isnan(temp3)] = 0
+# temp3_blur = gaussian(temp3, sigma=ridge_size*5) #
+# np.seterr(divide='ignore', invalid='ignore')
+# bg_blur = temp2_blur / temp3_blur
+
+# # Get rsize_norm (divided by bg_blur)
+# rsize_norm = rsize / bg_blur * 1.5
 
 # end = time.time()
 # print(f'  {(end-start):5.3f} s')
+
+# viewer = napari.Viewer()
+# viewer.add_image(bg_blur)
+# viewer.add_image(rsize_norm)
+
+# -----------------------------------------------------------------------------
+
+# start = time.time()
+# print('Get norm. bound')
+
+# # Get id, area and linear indexes
+# temp_bound_labels = bound_labels.ravel()
+# idx_sort = np.argsort(temp_bound_labels)
+# temp_bound_labels_sorted = temp_bound_labels[idx_sort]
+# all_id, idx_start, all_area = np.unique(
+#     temp_bound_labels_sorted,
+#     return_index=True,
+#     return_counts=True
+#     )
+# lin_idx = np.split(idx_sort, idx_start[1:]) 
+
+# bound_ratio = np.zeros_like(rsize)
+# for j in range(len(all_id)):  
+#     bound_id = all_id[j].astype('int')
+#     if bound_id > 0:
+#         # Get bound info                        
+#         bound_idx = np.unravel_index(lin_idx[j], bound_labels.shape)             
+#         bound_norm_int = np.nanmean(rsize_norm[bound_idx])
+#         bound_ratio[bound_labels==bound_id] = bound_norm_int
+
+
+# end = time.time()
+# print(f'  {(end-start):5.3f} s')
+
+# viewer = napari.Viewer()
+# viewer.add_image(rsize_norm)
+# viewer.add_image(bound_ratio)
 
 #%% Display -------------------------------------------------------------------
 
