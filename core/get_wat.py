@@ -27,7 +27,7 @@ from tools.nan import nanreplace
 
 '''
 
-#%% Function (get_bounds) --------------------------------------------------------
+#%% Function (get_bounds) -----------------------------------------------------
 
 def get_wat(
         raw, 
@@ -261,6 +261,7 @@ rsize = output_dict['rsize'][0]
 mask = output_dict['mask'][0]
 labels = output_dict['labels'][0]
 bound_labels = output_dict['bound_labels'][0]
+frame = 0
 
 # -----------------------------------------------------------------------------
 
@@ -275,51 +276,40 @@ background = nanreplace(
 background = nanreplace(
     background, int(np.ceil(ridge_size*2)//2*2+1), 'mean')
 
-rsize_norm = rsize-gaussian(background, sigma=ridge_size)
+end = time.time()
+print(f'  {(end-start):5.3f} s')
+
+# viewer = napari.Viewer()
+# viewer.add_image(rsize, contrast_limits=(-10,150))
+# viewer.add_image(background, contrast_limits=(-10,150))
+
+# -----------------------------------------------------------------------------
+
+start = time.time()
+print('Get bound ratio')
+
+# Get bound intensities
+props_rsize = regionprops(
+    bound_labels, 
+    intensity_image=(gaussian(rsize, ridge_size))
+    )
+props_background = regionprops(
+    bound_labels, 
+    intensity_image=(gaussian(background, ridge_size))
+    )
+bound_info = pd.DataFrame(([
+    (frame, i.label, i.intensity_mean, j.intensity_mean) 
+    for i, j in zip(props_rsize, props_background)]),
+    columns = ['frame', 'idx', 'rsize', 'background'],
+    )
+bound_info['ratio'] = bound_info['rsize']/bound_info['background']   
 
 end = time.time()
 print(f'  {(end-start):5.3f} s')
 
-viewer = napari.Viewer()
-viewer.add_image(rsize, contrast_limits=(-10,150))
-viewer.add_image(background, contrast_limits=(-10,150))
-viewer.add_image(rsize_norm)
-
-# -----------------------------------------------------------------------------
-
-# start = time.time()
-# print('Get norm. rsize')
-
-# # Get temp_mask
-# temp_mask = labels > 0
-# temp_mask = binary_dilation(
-#     temp_mask, footprint=disk(ridge_size)
-#     )
-
-# # viewer = napari.Viewer()
-# # viewer.add_image(temp_mask)
-
-# # Get bg_blur (with a nan ignoring Gaussian blur)
-# temp1 = rsize.astype('float')
-# temp1[temp_mask == 0] = np.nan
-# temp2 = temp1.copy()
-# temp2[np.isnan(temp2)] = 0
-# temp2_blur = gaussian(temp2, sigma=ridge_size*5) # 
-# temp3 = 0 * temp1.copy() + 1
-# temp3[np.isnan(temp3)] = 0
-# temp3_blur = gaussian(temp3, sigma=ridge_size*5) #
-# np.seterr(divide='ignore', invalid='ignore')
-# bg_blur = temp2_blur / temp3_blur
-
-# # Get rsize_norm (divided by bg_blur)
-# rsize_norm = rsize / bg_blur * 1.5
-
-# end = time.time()
-# print(f'  {(end-start):5.3f} s')
-
 # viewer = napari.Viewer()
-# viewer.add_image(bg_blur)
-# viewer.add_image(rsize_norm)
+# viewer.add_image(gaussian(rsize, ridge_size), contrast_limits=(-10,150))
+# viewer.add_image(gaussian(background, ridge_size), contrast_limits=(-10,150))
 
 # -----------------------------------------------------------------------------
 
