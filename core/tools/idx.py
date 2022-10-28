@@ -4,7 +4,7 @@ import numpy as np
 
 #%% rwhere
 
-def rwhere(img, val):
+def rwhere(labels, val):
     
     ''' General description.
     
@@ -26,7 +26,23 @@ def rwhere(img, val):
     
     '''
 
-    lin_idx = np.where(img.ravel() == val)
-    idx = np.unravel_index(lin_idx, img.shape)
+    lin_idx = np.where(labels.ravel() == val)
+    idx = np.unravel_index(lin_idx, labels.shape)
     
     return idx
+
+#%% rprops
+
+def rprops(labels):
+    
+    rlabels = labels.ravel()
+    sort = np.argsort(rlabels)
+    sort_labels = rlabels[sort]
+    lab, lab_start, count = np.unique(
+        sort_labels, return_index=True, return_counts=True)
+    lin_idx = np.split(sort, lab_start[1:])
+    idx = [np.unravel_index(lin_idx, labels.shape) for lin_idx in lin_idx]
+    
+    return idx, lab, count
+
+#%% Run -----------------------------------------------------------------------
