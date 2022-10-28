@@ -8,6 +8,7 @@ from skimage import io
 from pathlib import Path
 from joblib import Parallel, delayed 
 from skimage.transform import resize
+from skimage.restoration import rolling_ball
 from skimage.measure import label, regionprops
 from skimage.segmentation import watershed, clear_border
 from skimage.filters import sato, threshold_li, gaussian
@@ -32,10 +33,15 @@ def preprocess(raw, binning, ridge_size, thresh_coeff, parallel=False):
             anti_aliasing=True,
             )        
                 
+        # # Subtract background
+        # temp = white_tophat(rsize, footprint=(disk(ridge_size*2)))
+        # background = gaussian(rsize-temp, sigma=ridge_size*2, preserve_range=True)
+        # rsize = rsize / background
+        
         # Subtract background
-        temp = white_tophat(rsize, footprint=(disk(ridge_size*2)))
-        background = gaussian(rsize-temp, sigma=ridge_size*2, preserve_range=True)
-        rsize = rsize / background
+        rsize -= rolling_ball(
+            gaussian(rsize, sigma=ridge_size//2), radius=ridge_size*2,
+            )  
         
         # Apply ridge filter 
         ridges = sato(
@@ -101,8 +107,7 @@ def get_watershed(output_dict, parallel=False):
         return markers
     
     # Run function ---------------------------------------------------------
-    
-    # Unpack output_dict
+        
     ridges = output_dict['ridges']
     mask = output_dict['mask']
     
@@ -120,7 +125,7 @@ def get_watershed(output_dict, parallel=False):
                 ridges, mask,
                 )
             for ridges, mask 
-            in zip(output_dict['ridges'], output_dict['mask'])
+            in zip(ridges, mask)
             )
         
     else:
@@ -130,7 +135,7 @@ def get_watershed(output_dict, parallel=False):
                 ridges, mask,
                 )
             for ridges, mask 
-            in zip(output_dict['ridges'], output_dict['mask'])
+            in zip(ridges, mask)
             ]
         
     # Extract output dictionary
@@ -142,11 +147,11 @@ def get_watershed(output_dict, parallel=False):
 #%% Run -----------------------------------------------------------------------
 
 # File name
-raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
+# raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
 # raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
-# raw_name = 'Disc_Fixed_118hAEL_disc04_uint8.tif'
+raw_name = 'Disc_Fixed_118hAEL_disc04_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
 # raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
@@ -197,38 +202,65 @@ viewer.grid.enabled = True
 
 #%% Test ----------------------------------------------------------------------
 
-markers = output_dict['markers'][0]
+# markers = output_dict['markers'][0]
+# ridges = output_dict['ridges'][0]
+
+markers = output_dict['markers']
+ridges = output_dict['ridges']
+
+start = time.time()
+print('test')
 
 # 
-sorting_idx = np.argsort(markers.ravel())
-markers_sorted = markers.ravel()[sorting_idx]
-idx, idx_start, areas = np.unique(
-    markers_sorted,
-    return_index=True,
-    return_counts=True
-    )
-linear_idx = np.split(sorting_idx, idx_start[1:])
+sort = np.argsort(markers.ravel())
+sort_markers = markers.ravel()[sort]
+lab, lab_start, count = np.unique(
+    sort_markers, return_index=True, return_counts=True)
+lin_idx = np.split(sort, lab_start[1:]) # does it apply for all?
+idx = [np.unravel_index(lin_idx, markers.shape) for lin_idx in lin_idx]
 
-# # Get id, area and linear indexes
-# temp_bound_labels = bound_labels.ravel()
-# idx_sort = np.argsort(temp_bound_labels)
-# temp_bound_labels_sorted = temp_bound_labels[idx_sort]
-# all_id, idx_start, all_area = np.unique(
-#     temp_bound_labels_sorted,
-#     return_index=True,
-#     return_counts=True
-#     )
-# lin_idx = np.split(idx_sort, idx_start[1:]) 
+# -----------------------------------------------------------------------------
+
+valid = np.zeros_like(count)
+median = np.median(count)
+for i in range (len(idx)):
+    if count[i] < median/small_cell_cutoff: 
+        valid[i] = 1
+        markers[idx[i]] = 0 # Remove small cells
+    if count[i] > median*large_cell_cutoff: 
+        valid[i] = 2    
+        
+# -----------------------------------------------------------------------------
+
+# Get watershed labels
+labels = watershed(
+    ridges, 
+    markers, 
+    compactness=10/binning, 
+    watershed_line=True
+    ) 
+
+# Remove large cells
+for i in range (len(idx)):
+    if valid[i] == 2:
+        labels[labels==lab[i]] = 0
+
+# Remove border cells
+if remove_border_cells:
+    labels = clear_border(labels)
     
-# for j in range(len(all_id)):
-    
-#     bound_id = all_id[j].astype('int')
-    
-#     if bound_id > 0:
-    
-#         # Get bound info                        
-#         bound_idx = np.unravel_index(lin_idx[j], bound_labels.shape)             
-#         bound_area = all_area[j].astype('int')
-#         bound_norm_int = np.mean(bound_norm[bound_idx])
-#         bound_ctrd = (bound_idx[0].squeeze().mean(),
-#                       bound_idx[1].squeeze().mean())
+# Get watershed wat
+wat = labels == 0
+temp = np.invert(wat)
+temp = binary_dilation(temp)
+wat = np.minimum(wat, temp)
+        
+end = time.time()
+print(f'  {(end-start):5.3f} s')
+
+viewer = napari.Viewer()
+viewer.add_image(wat)
+viewer.add_labels(markers)
+viewer.add_labels(labels)
+viewer.grid.enabled = True
+
