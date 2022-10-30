@@ -3,16 +3,15 @@
 import time
 import napari
 import numpy as np
-import pandas as pd
 from skimage import io
 from pathlib import Path
+from skimage.measure import label
 from joblib import Parallel, delayed 
 from skimage.transform import resize
 from skimage.restoration import rolling_ball
-from skimage.measure import label, regionprops
 from skimage.segmentation import watershed, clear_border
 from skimage.filters import sato, threshold_li, gaussian
-from skimage.morphology import binary_dilation, remove_small_objects, square, disk, white_tophat
+from skimage.morphology import binary_dilation, remove_small_objects, square, disk
 
 from tools.idx import rprops
 from tools.conn import labconn
@@ -63,18 +62,18 @@ def pre_processing(raw, binning, ridge_size, thresh_coeff, parallel=False):
         # Run parallel
         output_list = Parallel(n_jobs=-1)(
             delayed(_pre_processing)(
-                img,
+                raw,
                 )
-            for img in raw
+            for raw in raw
             )
         
     else:
         
         # Run serial
         output_list = [_pre_processing(
-                img,
+                raw,
                 )
-            for img in raw
+            for raw in raw
             ]
         
     # Extract output dictionary
@@ -91,7 +90,13 @@ def pre_processing(raw, binning, ridge_size, thresh_coeff, parallel=False):
 
 #%% Get watershed -------------------------------------------------------------
 
-def get_watershed(output_dict, parallel=False):
+def get_watershed(
+        output_dict, 
+        small_cell_cutoff, 
+        large_cell_cutoff, 
+        remove_border_cells,
+        parallel=False
+        ):
     
     # Nested function ---------------------------------------------------------
     
@@ -188,7 +193,7 @@ def get_bounds(output_dict, parallel=False):
     
     # Nested function ---------------------------------------------------------
     
-    def _get_bounds(labels, wat):
+    def _get_bounds(rsize, labels, wat):
                
         # Get vertices
         vertices = labconn(wat, labels=labels, conn=2) > 2
@@ -209,16 +214,36 @@ def get_bounds(output_dict, parallel=False):
         small_bound_labels[small_bound_labels == np.max(bound_labels)] = 0
         bound_labels = bound_labels + small_bound_labels
         
-        return vertices, bound_labels
+        # Get rsize_norm
+        temp_mask = binary_dilation(labels > 0, footprint=disk(ridge_size*2))
+        temp_mask = gaussian(temp_mask, sigma=ridge_size*2)
+        temp_blur = gaussian(rsize, sigma=ridge_size*6)
+        np.seterr(divide='ignore', invalid='ignore')
+        rsize_norm = (rsize / temp_blur) * temp_mask
+        rsize_norm = gaussian(rsize_norm, sigma=ridge_size//2)
+
+        # Get bound properties
+        idx, lab, count = rprops(bound_labels)
+
+        # Get rsize_norm intensities with bounds  
+        temp_int = [np.mean(rsize_norm[idx[i]]) for i in range(len(idx))]
+        bound_int = np.zeros_like(rsize)
+        for i in range(1,len(idx)):
+            bound_int[idx[i]] = temp_int[i]
+
+        
+        return vertices, bound_labels, rsize_norm, bound_int
     
     # Run ---------------------------------------------------------------------
         
+    rsize = output_dict['rsize']
     labels = output_dict['labels']
     wat = output_dict['wat']
     
     # Add one dimension (if ndim == 2)
-    ndim = (labels.ndim)        
+    ndim = (rsize.ndim)        
     if ndim == 2:
+        rsize = rsize.reshape((1, rsize.shape[0], rsize.shape[1]))
         labels = labels.reshape((1, labels.shape[0], labels.shape[1]))  
         wat = wat.reshape((1, wat.shape[0], wat.shape[1])) 
     
@@ -227,20 +252,20 @@ def get_bounds(output_dict, parallel=False):
         # Run parallel
         output_list = Parallel(n_jobs=-1)(
             delayed(_get_bounds)(
-                labels, wat,
+                rsize, labels, wat,
                 )
-            for labels, wat
-            in zip(labels, wat)
+            for rsize, labels, wat
+            in zip(rsize, labels, wat)
             )
         
     else:
         
         # Run serial
         output_list = [_get_bounds(
-                labels, wat,
+                rsize, labels, wat,
                 )
-            for labels, wat
-            in zip(labels, wat)
+            for rsize, labels, wat
+            in zip(rsize, labels, wat)
             ]
         
     # Extract output dictionary
@@ -248,8 +273,87 @@ def get_bounds(output_dict, parallel=False):
         [data[0] for data in output_list], axis=0).squeeze()
     output_dict['bound_labels'] = np.stack(
         [data[1] for data in output_list], axis=0).squeeze()
+    output_dict['rsize_norm'] = np.stack(
+        [data[2] for data in output_list], axis=0).squeeze()
+    output_dict['bound_int'] = np.stack(
+        [data[3] for data in output_list], axis=0).squeeze()
     
     return output_dict
+
+#%% Task ----------------------------------------------------------------------
+
+def get_seg(
+        raw,
+        binning,
+        ridge_size,
+        thresh_coeff, 
+        small_cell_cutoff, 
+        large_cell_cutoff, 
+        remove_border_cells,
+        ):
+    
+    # Nested function ---------------------------------------------------------
+    
+    def _get_seg(raw):
+        
+        output_dict = pre_processing(
+            raw,
+            binning,
+            ridge_size,
+            thresh_coeff,
+            parallel=False
+            )
+        
+        output_dict = get_watershed(
+            output_dict, 
+            small_cell_cutoff, 
+            large_cell_cutoff, 
+            remove_border_cells,
+            parallel=False
+            )
+        
+        output_dict = get_bounds(
+            output_dict,
+            parallel=False
+            )
+        
+        return output_dict
+    
+    # Run ---------------------------------------------------------------------
+    
+    # Add one dimension (if ndim == 2)
+    ndim = (raw.ndim)        
+    if ndim == 2:
+        raw = raw.reshape((1, raw.shape[0], raw.shape[1]))  
+        
+    if ndim == 3:
+    
+        # Run parallel
+        output_list = Parallel(n_jobs=-1)(
+            delayed(_get_seg)(
+                raw,
+                )
+            for raw in raw
+            )
+        
+    elif ndim == 2:
+        
+        # Run serial
+        output_list = [_get_seg(
+                raw,
+                )
+            for raw in raw
+            ]
+    
+    # Extract output dictionary
+    output_dict = {}
+    for key in output_list[0].keys():
+        output_dict[key] = np.array(
+            [output[key] for output in output_list]
+            )
+
+    return output_dict
+
 
 #%% Run -----------------------------------------------------------------------
 
@@ -265,7 +369,7 @@ raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # Parameters
 binning = 2
 ridge_size = 4/binning
-thresh_coeff = 0.25
+thresh_coeff = 0.5
 small_cell_cutoff = 10
 large_cell_cutoff = 10
 remove_border_cells = True
@@ -298,6 +402,9 @@ print('Get watershed')
 
 output_dict = get_watershed(
     output_dict,
+    small_cell_cutoff,
+    large_cell_cutoff,
+    remove_border_cells,
     parallel=True
     )
 
@@ -320,6 +427,26 @@ print(f'  {(end-start):5.3f} s')
 
 # -----------------------------------------------------------------------------
 
+# Get seg
+start = time.time()
+print('Get seg')
+
+output_list = get_seg(
+    raw,
+    binning,
+    ridge_size,
+    thresh_coeff, 
+    small_cell_cutoff, 
+    large_cell_cutoff, 
+    remove_border_cells,
+    )
+
+end = time.time()
+print(f'  {(end-start):5.3f} s')
+
+# -----------------------------------------------------------------------------
+
+# All
 viewer = napari.Viewer()
 viewer.add_image(output_dict['rsize'])
 viewer.add_image(output_dict['ridges'])
@@ -329,143 +456,13 @@ viewer.add_labels(output_dict['labels'])
 viewer.add_image(output_dict['wat'])
 viewer.add_image(output_dict['vertices'])
 viewer.add_labels(output_dict['bound_labels'])
+viewer.add_image(output_dict['rsize_norm'])
+viewer.add_image(output_dict['bound_int'], colormap='inferno')
 viewer.grid.enabled = True
+
+# # Overlay
+# viewer = napari.Viewer()
+# viewer.add_image(output_dict['rsize'], opacity=0.66)
+# viewer.add_image(output_dict['wat'], blending='additive', colormap='red')
 
 #%% Test ----------------------------------------------------------------------
-
-# rsize = output_dict['rsize']
-# ridges = output_dict['ridges']
-# mask = output_dict['mask']
-# markers = output_dict['markers']
-# labels = output_dict['labels']
-# bound_labels = output_dict['bound_labels']
-
-rsize = output_dict['rsize'][0]
-ridges = output_dict['ridges'][0]
-mask = output_dict['mask'][0]
-markers = output_dict['markers'][0]
-labels = output_dict['labels'][0]
-bound_labels = output_dict['bound_labels'][0]
-
-# start = time.time()
-# print('test #1')
-
-# # Get temp_mask
-# temp_mask = labels > 0
-# temp_mask = binary_dilation(
-#     temp_mask, footprint=disk(ridge_size)
-#     )
-
-# # Get bg_blur (with a nan ignoring Gaussian blur)
-# temp1 = rsize.astype('float')
-# temp1[temp_mask == 0] = np.nan
-
-# temp2 = temp1.copy()
-# temp2[np.isnan(temp2)] = 0
-# temp2_blur = gaussian(temp2, sigma=ridge_size*10)
-
-# temp3 = 0 * temp1.copy() + 1
-# temp3[np.isnan(temp3)] = 0
-# temp3_blur = gaussian(temp3, sigma=ridge_size*10)
-
-# np.seterr(divide='ignore', invalid='ignore')
-# bg_blur = temp2_blur / temp3_blur
-
-# # Get rsize_blur (divided by bg_blur)
-# bound_norm = gaussian(rsize, sigma=ridge_size//2)
-# bound_norm = bound_norm / bg_blur *1.5
-
-# # Get bound properties
-# idx, lab, count = rprops(bound_labels)
-
-# # Get rsize intensities with bounds  
-# temp_int = [np.mean(bound_norm[idx[i]]) for i in range(len(idx))]
-# bound_int = np.zeros_like(rsize)
-# for i in range(1,len(idx)):
-#     bound_int[idx[i]] = temp_int[i]
-
-# end = time.time()
-# print(f'  {(end-start):5.3f} s')
-
-# -----------------------------------------------------------------------------
-
-# start = time.time()
-# print('test #2')
-
-# # Get temp_mask
-# temp_mask = binary_dilation(
-#     labels > 0, footprint=disk(ridge_size)
-#     )
-
-# temp1 = rsize.copy()
-# temp1[temp_mask == 0] = 0
-# temp2 = temp_mask.copy().astype('float')
-
-# temp1_blur = gaussian(temp1, sigma=ridge_size*5)
-# temp2_blur = gaussian(temp2, sigma=ridge_size*5)
-
-# np.seterr(divide='ignore', invalid='ignore')
-# bg_blur = temp1_blur / temp2_blur
-
-# # Get rsize_blur (divided by bg_blur)
-# bound_norm = gaussian(rsize, sigma=ridge_size//2)
-# bound_norm = bound_norm / bg_blur
-
-# end = time.time()
-# print(f'  {(end-start):5.3f} s')
-
-# viewer = napari.Viewer()
-# viewer.add_image(rsize)
-# viewer.add_image(temp_mask)
-# viewer.add_image(temp1)
-# viewer.add_image(temp2)
-# viewer.add_image(temp1_blur)
-# viewer.add_image(temp2_blur)
-# viewer.add_image(bg_blur)
-# viewer.add_image(bound_norm)
-# viewer.grid.enabled = True
-
-# -----------------------------------------------------------------------------
-
-start = time.time()
-print('test #3')
-
-temp_mask = binary_dilation(labels > 0, footprint=disk(ridge_size*2))
-temp_mask = gaussian(temp_mask, sigma=ridge_size*2)
-temp_blur = gaussian(rsize, sigma=ridge_size*6)
-rsize_norm = (rsize / temp_blur) * temp_mask
-rsize_norm = gaussian(rsize_norm, sigma=ridge_size//2)
-
-# Get bound properties
-idx, lab, count = rprops(bound_labels)
-
-# Get rsize intensities with bounds  
-temp_int = [np.mean(rsize_norm[idx[i]]) for i in range(len(idx))]
-bound_int = np.zeros_like(rsize)
-for i in range(1,len(idx)):
-    bound_int[idx[i]] = temp_int[i]
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
-
-# -----------------------------------------------------------------------------
-
-start = time.time()
-print('test #4')
-
-temp_blur = gaussian(ridges, sigma=ridge_size*6)
-ridge_norm = (ridges / temp_blur)
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
-
-# -----------------------------------------------------------------------------
-
-viewer = napari.Viewer()
-viewer.add_image(temp_mask)
-viewer.add_image(rsize)
-viewer.add_image(temp_blur)
-viewer.add_image(rsize_norm)
-viewer.add_image(bound_int, colormap='inferno')
-viewer.add_image(ridge_norm)
-viewer.grid.enabled = True
