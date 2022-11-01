@@ -61,7 +61,7 @@ def widget(raw):
     
     @magicgui(
         
-        auto_call = True,
+        auto_call = False,
                        
         frame = {
             'widget_type': 'SpinBox', 
