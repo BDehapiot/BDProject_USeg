@@ -282,7 +282,7 @@ def get_bounds(output_dict, parallel=False):
 
 #%% Task ----------------------------------------------------------------------
 
-def get_seg(
+def useg(
         raw,
         binning,
         ridge_size,
@@ -294,7 +294,7 @@ def get_seg(
     
     # Nested function ---------------------------------------------------------
     
-    def _get_seg(raw):
+    def _useg(raw):
         
         output_dict = pre_processing(
             raw,
@@ -330,7 +330,7 @@ def get_seg(
     
         # Run parallel
         output_list = Parallel(n_jobs=-1)(
-            delayed(_get_seg)(
+            delayed(_useg)(
                 raw,
                 )
             for raw in raw
@@ -339,7 +339,7 @@ def get_seg(
     elif ndim == 2:
         
         # Run serial
-        output_list = [_get_seg(
+        output_list = [_useg(
                 raw,
                 )
             for raw in raw
@@ -357,8 +357,8 @@ def get_seg(
 
 #%% Run -----------------------------------------------------------------------
 
-# File name
-raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
+# # File name
+# raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
 # raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
@@ -366,99 +366,99 @@ raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
 # raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
-# Parameters
-binning = 2
-ridge_size = 4/binning
-thresh_coeff = 0.5
-small_cell_cutoff = 10
-large_cell_cutoff = 10
-remove_border_cells = True
+# # Parameters
+# binning = 2
+# ridge_size = 4/binning
+# thresh_coeff = 0.5
+# small_cell_cutoff = 10
+# large_cell_cutoff = 10
+# remove_border_cells = True
 
-# Open data
-raw = io.imread(Path('../data/', raw_name))
-
-# -----------------------------------------------------------------------------
-
-# Pre-processing
-start = time.time()
-print('Pre-processing')
-
-output_dict = pre_processing(
-    raw, 
-    binning, 
-    ridge_size, 
-    thresh_coeff, 
-    parallel=True
-    )
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
+# # Open data
+# raw = io.imread(Path('../data/', raw_name))
 
 # -----------------------------------------------------------------------------
 
-# Get watershed
-start = time.time()
-print('Get watershed')
+# # Pre-processing
+# start = time.time()
+# print('Pre-processing')
 
-output_dict = get_watershed(
-    output_dict,
-    small_cell_cutoff,
-    large_cell_cutoff,
-    remove_border_cells,
-    parallel=True
-    )
+# output_dict = pre_processing(
+#     raw, 
+#     binning, 
+#     ridge_size, 
+#     thresh_coeff, 
+#     parallel=True
+#     )
 
-end = time.time()
-print(f'  {(end-start):5.3f} s')
-
-# -----------------------------------------------------------------------------
-
-# Get bounds
-start = time.time()
-print('Get bounds')
-
-output_dict = get_bounds(
-    output_dict,
-    parallel=True
-    )
-
-end = time.time()
-print(f'  {(end-start):5.3f} s')
+# end = time.time()
+# print(f'  {(end-start):5.3f} s')
 
 # -----------------------------------------------------------------------------
 
-# Get seg
-start = time.time()
-print('Get seg')
+# # Get watershed
+# start = time.time()
+# print('Get watershed')
 
-output_list = get_seg(
-    raw,
-    binning,
-    ridge_size,
-    thresh_coeff, 
-    small_cell_cutoff, 
-    large_cell_cutoff, 
-    remove_border_cells,
-    )
+# output_dict = get_watershed(
+#     output_dict,
+#     small_cell_cutoff,
+#     large_cell_cutoff,
+#     remove_border_cells,
+#     parallel=True
+#     )
 
-end = time.time()
-print(f'  {(end-start):5.3f} s')
+# end = time.time()
+# print(f'  {(end-start):5.3f} s')
 
 # -----------------------------------------------------------------------------
 
-# All
-viewer = napari.Viewer()
-viewer.add_image(output_dict['rsize'])
-viewer.add_image(output_dict['ridges'])
-viewer.add_image(output_dict['mask'])
-viewer.add_labels(output_dict['markers'])
-viewer.add_labels(output_dict['labels'])
-viewer.add_image(output_dict['wat'])
-viewer.add_image(output_dict['vertices'])
-viewer.add_labels(output_dict['bound_labels'])
-viewer.add_image(output_dict['rsize_norm'])
-viewer.add_image(output_dict['bound_int'], colormap='inferno')
-viewer.grid.enabled = True
+# # Get bounds
+# start = time.time()
+# print('Get bounds')
+
+# output_dict = get_bounds(
+#     output_dict,
+#     parallel=True
+#     )
+
+# end = time.time()
+# print(f'  {(end-start):5.3f} s')
+
+# -----------------------------------------------------------------------------
+
+# # USeg
+# start = time.time()
+# print('useg')
+
+# output_dict = useg(
+#     raw,
+#     binning,
+#     ridge_size,
+#     thresh_coeff, 
+#     small_cell_cutoff, 
+#     large_cell_cutoff, 
+#     remove_border_cells,
+#     )
+
+# end = time.time()
+# print(f'  {(end-start):5.3f} s')
+
+# -----------------------------------------------------------------------------
+
+# # All
+# viewer = napari.Viewer()
+# viewer.add_image(output_dict['rsize'])
+# viewer.add_image(output_dict['ridges'])
+# viewer.add_image(output_dict['mask'])
+# viewer.add_labels(output_dict['markers'])
+# viewer.add_labels(output_dict['labels'])
+# viewer.add_image(output_dict['wat'])
+# viewer.add_image(output_dict['vertices'])
+# viewer.add_labels(output_dict['bound_labels'])
+# viewer.add_image(output_dict['rsize_norm'])
+# viewer.add_image(output_dict['bound_int'], colormap='inferno')
+# viewer.grid.enabled = True
 
 # # Overlay
 # viewer = napari.Viewer()

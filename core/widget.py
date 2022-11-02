@@ -8,7 +8,7 @@ from pathlib import Path
 from magicgui import magicgui
 from skimage.transform import resize
 
-from get_wat import get_wat
+from functions import pre_processing, get_watershed, get_bounds, useg
 
 #%% To do list ----------------------------------------------------------------
 
@@ -57,11 +57,12 @@ def widget(raw):
             ),
         )
     
-#%% Display -------------------------------------------------------------------
+#%% Preview -------------------------------------------------------------------
     
     @magicgui(
         
         auto_call = False,
+        call_button="Preview",
                        
         frame = {
             'widget_type': 'SpinBox', 
@@ -110,16 +111,10 @@ def widget(raw):
             'label': 'remove border cells',
             'value': False, 
             },        
-        
-        preview = {
-            'widget_type': 'CheckBox',
-            'label': 'preview',
-            'value': False, 
-            },
-                
+                        
         )
 
-    def display(
+    def preview(
             frame: int,
             binning: int,
             ridge_size: float,
@@ -127,129 +122,66 @@ def widget(raw):
             small_cell_cutoff: int,
             large_cell_cutoff: int,
             remove_border_cells: bool,           
-            preview: bool,
             ):
         
         # Get info
-        t = display.frame.value         
+        t = preview.frame.value         
         viewer.text_overlay.visible = True
         viewer.text_overlay.text = f'frame = {t}'
-                
-        if not preview:
-     
-            # Initialize raw display
-            if not viewer.layers.__contains__('raw'): 
-               
-                viewer.add_image(
-                    raw[t,...], 
-                    name='raw',
-                    colormap='gray',
-                    contrast_limits=(
-                        np.quantile(raw, 0.001),
-                        np.quantile(raw, 0.999),
-                        ),
-                    )
-                                
-                viewer.reset_view()
+       
+        # Get preview (one frame)          
+        output_dict = useg(
+            raw[t,...],
+            binning,
+            ridge_size,
+            thresh_coeff, 
+            small_cell_cutoff, 
+            large_cell_cutoff, 
+            remove_border_cells,
+            )
+        
+        # Update raw for display
+        viewer.layers['raw'].data = raw[t,...]
+        viewer.layers['raw'].opacity = 0.66
+        
+        # Resize wat for display
+        wat = output_dict['wat']
+        watsize = resize(wat, (            
+            int(wat.shape[0]*binning), 
+            int(wat.shape[1]*binning)),
+            preserve_range=True, 
+            ) 
+        
+        # Add wat for display (first iteration)
+        if not viewer.layers.__contains__('wat'): 
             
-            # Update raw display (preview off)
-            else:
-                viewer.layers['raw'].data = raw[t,...]
-                viewer.layers['raw'].opacity = 1
-
-            if viewer.layers.__contains__('wat'): 
-                viewer.layers.remove('wat') 
-                
-        else:
-            
-            # Update raw display (preview on)
-            viewer.layers['raw'].data = raw[t,...]
-            viewer.layers['raw'].opacity = 0.66
-            
-            # Get wat (one frame)       
-            output_dict = get_wat(
-                raw[t,...], 
-                binning, 
-                ridge_size, 
-                thresh_coeff, 
-                small_cell_cutoff,
-                large_cell_cutoff,
-                remove_border_cells=remove_border_cells, 
-                parallel=False
+            viewer.add_image(
+                watsize, 
+                name='wat',
+                colormap='red',
+                contrast_limits=(0, 1),
+                blending='additive',
                 )
             
-            # Process wat for display
-            wat = output_dict['wat']
-            watsize = resize(wat, (            
-                int(wat.shape[0]*binning), 
-                int(wat.shape[1]*binning)),
-                preserve_range=True, 
-                )   
-            
-            # Initialize wat display
-            if not viewer.layers.__contains__('wat'): 
-                
-                viewer.add_image(
-                    watsize, 
-                    name='wat',
-                    colormap='red',
-                    contrast_limits=(0, 1),
-                    blending='additive',
-                    )
-                
-            # Update wat display    
-            else:
-                viewer.layers['wat'].data = watsize
-                
-#%% Process
-
-    @magicgui(
+        # Update wat for display   
+        else:
+            viewer.layers['wat'].data = watsize
         
-        auto_call = False,
-        call_button="Process and save",
         
-        )
-
-    def process():
-        
-        start = time.time()
-        print('get_wat')
-        
-        # Get wat (all frames)          
-        output_dict = get_wat(
-            raw, 
-            display.binning.value, 
-            display.ridge_size.value, 
-            display.thresh_coeff.value, 
-            display.small_cell_cutoff.value,
-            display.large_cell_cutoff.value,
-            display.remove_border_cells.value, 
-            parallel=True
-            )
-        
-        end = time.time()
-        print(f'  {(end-start):5.3f} s')
-        
-        # Save wat
-        io.imsave(
-            Path('../data/', raw_name.replace('.tif', '_wat.tif')),
-            output_dict['wat'].astype('uint8')*255,
-            check_contrast=False,
-            )
-    
+                                   
 #%% Shortcuts -----------------------------------------------------------------
 
     @viewer.bind_key('Right')
     def next_frame(viewer):
                 
-        if display.frame.value < raw.shape[0]-1:
-            display.frame.value += 1
+        if preview.frame.value < raw.shape[0]-1:
+            preview.frame.value += 1
             
     @viewer.bind_key('Left')
     def previous_frame(viewer):
 
-        if display.frame.value > 0:
-            display.frame.value -= 1   
+        if preview.frame.value > 0:
+            preview.frame.value -= 1   
             
     @viewer.bind_key('p', overwrite=True)
     def hide_wat(viewer):
@@ -262,7 +194,7 @@ def widget(raw):
 #%% Add dock widget -----------------------------------------------------------
     
     viewer.window.add_dock_widget(
-        [display, process], 
+        [preview], 
         area='right', 
         name='widget'
         )
