@@ -19,7 +19,13 @@ from tools.nan import nanreplace
 
 #%% Pre-processing ------------------------------------------------------------
 
-def pre_processing(raw, binning, ridge_size, thresh_coeff, parallel=False):
+def pre_processing(
+        raw, 
+        binning, 
+        ridge_size, 
+        thresh_coeff, 
+        parallel=False
+        ):
     
     # Nested function ---------------------------------------------------------
             
@@ -92,6 +98,9 @@ def pre_processing(raw, binning, ridge_size, thresh_coeff, parallel=False):
 
 def get_watershed(
         output_dict, 
+        binning, 
+        ridge_size, 
+        thresh_coeff,
         small_cell_cutoff, 
         large_cell_cutoff, 
         remove_border_cells,
@@ -189,7 +198,13 @@ def get_watershed(
 
 #%% Get bounds ----------------------------------------------------------------
 
-def get_bounds(output_dict, parallel=False):
+def get_bounds(
+        output_dict,
+        binning, 
+        ridge_size, 
+        thresh_coeff,
+        parallel=False
+        ):
     
     # Nested function ---------------------------------------------------------
     

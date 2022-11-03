@@ -132,12 +132,12 @@ def widget(raw):
         # Get preview (one frame)          
         output_dict = useg(
             raw[t,...],
-            binning,
-            ridge_size,
-            thresh_coeff, 
-            small_cell_cutoff, 
-            large_cell_cutoff, 
-            remove_border_cells,
+            preview.binning.value, 
+            preview.ridge_size.value/preview.binning.value, 
+            preview.thresh_coeff.value, 
+            preview.small_cell_cutoff.value,
+            preview.large_cell_cutoff.value,
+            preview.remove_border_cells.value, 
             )
         
         # Update raw for display
@@ -152,7 +152,7 @@ def widget(raw):
             preserve_range=True, 
             ) 
         
-        # Add wat for display (first iteration)
+        # Add wat for display (initialization)
         if not viewer.layers.__contains__('wat'): 
             
             viewer.add_image(
