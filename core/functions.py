@@ -19,17 +19,20 @@ from tools.nan import nanreplace
 
 #%% Pre-processing ------------------------------------------------------------
 
-def pre_processing(
+def get_watershed(
         raw, 
         binning, 
         ridge_size, 
         thresh_coeff, 
+        small_cell_cutoff, 
+        large_cell_cutoff, 
+        remove_border_cells,
         parallel=False
         ):
     
     # Nested function ---------------------------------------------------------
             
-    def _pre_processing(raw):
+    def _get_watershed(raw):
         
         # Resize (according to binning)  
         rsize = resize(raw, (
@@ -54,63 +57,6 @@ def pre_processing(
         mask = ridges > thresh*thresh_coeff
         mask = remove_small_objects(mask, min_size=np.sum(mask)*0.01)
         
-        return rsize, ridges, mask
-    
-    # Run ---------------------------------------------------------------------
-    
-    # Add one dimension (if ndim == 2)
-    ndim = (raw.ndim)        
-    if ndim == 2:
-        raw = raw.reshape((1, raw.shape[0], raw.shape[1]))  
-    
-    if parallel:
-    
-        # Run parallel
-        output_list = Parallel(n_jobs=-1)(
-            delayed(_pre_processing)(
-                raw,
-                )
-            for raw in raw
-            )
-        
-    else:
-        
-        # Run serial
-        output_list = [_pre_processing(
-                raw,
-                )
-            for raw in raw
-            ]
-        
-    # Extract output dictionary
-    output_dict = {
-        'rsize': np.stack(
-            [data[0] for data in output_list], axis=0).squeeze(),
-        'ridges': np.stack(
-            [data[1] for data in output_list], axis=0).squeeze(),
-        'mask': np.stack(
-            [data[2] for data in output_list], axis=0).squeeze(),
-        }
-    
-    return output_dict
-
-#%% Get watershed -------------------------------------------------------------
-
-def get_watershed(
-        output_dict, 
-        binning, 
-        ridge_size, 
-        thresh_coeff,
-        small_cell_cutoff, 
-        large_cell_cutoff, 
-        remove_border_cells,
-        parallel=False
-        ):
-    
-    # Nested function ---------------------------------------------------------
-    
-    def _get_watershed(ridges, mask):
-        
         # Get markers
         markers = label(np.invert(mask), connectivity=1)
         
@@ -119,12 +65,11 @@ def get_watershed(
 
         # Filter cell according to area
         valid = np.zeros_like(count)
-        median = np.median(count)
         for i in range (len(idx)):
-            if count[i] < median/small_cell_cutoff: 
+            if count[i] < small_cell_cutoff: 
                 valid[i] = 1 
                 markers[idx[i]] = 0 # Remove small cells
-            if count[i] > median*large_cell_cutoff: 
+            if count[i] > large_cell_cutoff: 
                 valid[i] = 2 # Detect large cells    
 
         # Get watershed labels
@@ -152,64 +97,6 @@ def get_watershed(
         temp = binary_dilation(temp)
         wat = np.minimum(wat, temp)
         
-        return markers, labels, wat
-    
-    # Run ---------------------------------------------------------------------
-        
-    ridges = output_dict['ridges']
-    mask = output_dict['mask']
-    
-    # Add one dimension (if ndim == 2)
-    ndim = (ridges.ndim)        
-    if ndim == 2:
-        ridges = ridges.reshape((1, ridges.shape[0], ridges.shape[1]))  
-        mask = mask.reshape((1, mask.shape[0], mask.shape[1])) 
-    
-    if parallel:
-    
-        # Run parallel
-        output_list = Parallel(n_jobs=-1)(
-            delayed(_get_watershed)(
-                ridges, mask,
-                )
-            for ridges, mask 
-            in zip(ridges, mask)
-            )
-        
-    else:
-        
-        # Run serial
-        output_list = [_get_watershed(
-                ridges, mask,
-                )
-            for ridges, mask 
-            in zip(ridges, mask)
-            ]
-        
-    # Extract output dictionary
-    output_dict['markers'] = np.stack(
-        [data[0] for data in output_list], axis=0).squeeze()
-    output_dict['labels'] = np.stack(
-        [data[1] for data in output_list], axis=0).squeeze()
-    output_dict['wat'] = np.stack(
-        [data[2] for data in output_list], axis=0).squeeze()
-    
-    return output_dict
-
-#%% Get bounds ----------------------------------------------------------------
-
-def get_bounds(
-        output_dict,
-        binning, 
-        ridge_size, 
-        thresh_coeff,
-        parallel=False
-        ):
-    
-    # Nested function ---------------------------------------------------------
-    
-    def _get_bounds(rsize, labels, wat):
-               
         # Get vertices
         vertices = labconn(wat, labels=labels, conn=2) > 2
         
@@ -245,94 +132,8 @@ def get_bounds(
         bound_int = np.zeros_like(rsize)
         for i in range(1,len(idx)):
             bound_int[idx[i]] = temp_int[i]
-
         
-        return vertices, bound_labels, rsize_norm, bound_int
-    
-    # Run ---------------------------------------------------------------------
-        
-    rsize = output_dict['rsize']
-    labels = output_dict['labels']
-    wat = output_dict['wat']
-    
-    # Add one dimension (if ndim == 2)
-    ndim = (rsize.ndim)        
-    if ndim == 2:
-        rsize = rsize.reshape((1, rsize.shape[0], rsize.shape[1]))
-        labels = labels.reshape((1, labels.shape[0], labels.shape[1]))  
-        wat = wat.reshape((1, wat.shape[0], wat.shape[1])) 
-    
-    if parallel:
-    
-        # Run parallel
-        output_list = Parallel(n_jobs=-1)(
-            delayed(_get_bounds)(
-                rsize, labels, wat,
-                )
-            for rsize, labels, wat
-            in zip(rsize, labels, wat)
-            )
-        
-    else:
-        
-        # Run serial
-        output_list = [_get_bounds(
-                rsize, labels, wat,
-                )
-            for rsize, labels, wat
-            in zip(rsize, labels, wat)
-            ]
-        
-    # Extract output dictionary
-    output_dict['vertices'] = np.stack(
-        [data[0] for data in output_list], axis=0).squeeze()
-    output_dict['bound_labels'] = np.stack(
-        [data[1] for data in output_list], axis=0).squeeze()
-    output_dict['rsize_norm'] = np.stack(
-        [data[2] for data in output_list], axis=0).squeeze()
-    output_dict['bound_int'] = np.stack(
-        [data[3] for data in output_list], axis=0).squeeze()
-    
-    return output_dict
-
-#%% Task ----------------------------------------------------------------------
-
-def useg(
-        raw,
-        binning,
-        ridge_size,
-        thresh_coeff, 
-        small_cell_cutoff, 
-        large_cell_cutoff, 
-        remove_border_cells,
-        ):
-    
-    # Nested function ---------------------------------------------------------
-    
-    def _useg(raw):
-        
-        output_dict = pre_processing(
-            raw,
-            binning,
-            ridge_size,
-            thresh_coeff,
-            parallel=False
-            )
-        
-        output_dict = get_watershed(
-            output_dict, 
-            small_cell_cutoff, 
-            large_cell_cutoff, 
-            remove_border_cells,
-            parallel=False
-            )
-        
-        output_dict = get_bounds(
-            output_dict,
-            parallel=False
-            )
-        
-        return output_dict
+        return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels, rsize_norm, bound_int
     
     # Run ---------------------------------------------------------------------
     
@@ -340,40 +141,61 @@ def useg(
     ndim = (raw.ndim)        
     if ndim == 2:
         raw = raw.reshape((1, raw.shape[0], raw.shape[1]))  
-        
-    if ndim == 3:
+    
+    # Adjust parameters to binning
+    ridge_size = ridge_size/binning
+    small_cell_cutoff = small_cell_cutoff/np.square(binning)
+    large_cell_cutoff = large_cell_cutoff/np.square(binning)
+    
+    if parallel:
     
         # Run parallel
         output_list = Parallel(n_jobs=-1)(
-            delayed(_useg)(
+            delayed(_get_watershed)(
                 raw,
                 )
             for raw in raw
             )
         
-    elif ndim == 2:
+    else:
         
         # Run serial
-        output_list = [_useg(
+        output_list = [_get_watershed(
                 raw,
                 )
             for raw in raw
             ]
-    
+        
     # Extract output dictionary
-    output_dict = {}
-    for key in output_list[0].keys():
-        output_dict[key] = np.array(
-            [output[key] for output in output_list]
-            )
-
+    output_dict = {
+        'rsize': np.stack(
+            [data[0] for data in output_list], axis=0).squeeze(),
+        'ridges': np.stack(
+            [data[1] for data in output_list], axis=0).squeeze(),
+        'mask': np.stack(
+            [data[2] for data in output_list], axis=0).squeeze(),
+        'markers': np.stack(
+            [data[3] for data in output_list], axis=0).squeeze(),
+        'labels': np.stack(
+            [data[4] for data in output_list], axis=0).squeeze(),
+        'wat': np.stack(
+            [data[5] for data in output_list], axis=0).squeeze(),
+        'vertices': np.stack(
+            [data[6] for data in output_list], axis=0).squeeze(),
+        'bound_labels': np.stack(
+            [data[7] for data in output_list], axis=0).squeeze(),
+        'rsize_norm': np.stack(
+            [data[8] for data in output_list], axis=0).squeeze(),
+        'bound_int': np.stack(
+            [data[9] for data in output_list], axis=0).squeeze(),
+        }
+    
     return output_dict
-
 
 #%% Run -----------------------------------------------------------------------
 
-# # File name
-# raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
+# File name
+raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
 # raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
@@ -381,83 +203,36 @@ def useg(
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
 # raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
-# # Parameters
-# binning = 2
-# ridge_size = 4/binning
-# thresh_coeff = 0.5
-# small_cell_cutoff = 10
-# large_cell_cutoff = 10
-# remove_border_cells = True
+# Parameters
+binning = 2
+ridge_size = 4
+thresh_coeff = 0.5
+small_cell_cutoff = 100
+large_cell_cutoff = 20000
+remove_border_cells = True
 
-# # Open data
-# raw = io.imread(Path('../data/', raw_name))
-
-# -----------------------------------------------------------------------------
-
-# # Pre-processing
-# start = time.time()
-# print('Pre-processing')
-
-# output_dict = pre_processing(
-#     raw, 
-#     binning, 
-#     ridge_size, 
-#     thresh_coeff, 
-#     parallel=True
-#     )
-
-# end = time.time()
-# print(f'  {(end-start):5.3f} s')
+# Open data
+raw = io.imread(Path('../data/', raw_name))
 
 # -----------------------------------------------------------------------------
 
-# # Get watershed
-# start = time.time()
-# print('Get watershed')
+# Get watershed
+start = time.time()
+print('Get watershed')
 
-# output_dict = get_watershed(
-#     output_dict,
-#     small_cell_cutoff,
-#     large_cell_cutoff,
-#     remove_border_cells,
-#     parallel=True
-#     )
+output_dict = get_watershed(
+    raw, 
+    binning, 
+    ridge_size, 
+    thresh_coeff, 
+    small_cell_cutoff, 
+    large_cell_cutoff, 
+    remove_border_cells,
+    parallel=True
+    )
 
-# end = time.time()
-# print(f'  {(end-start):5.3f} s')
-
-# -----------------------------------------------------------------------------
-
-# # Get bounds
-# start = time.time()
-# print('Get bounds')
-
-# output_dict = get_bounds(
-#     output_dict,
-#     parallel=True
-#     )
-
-# end = time.time()
-# print(f'  {(end-start):5.3f} s')
-
-# -----------------------------------------------------------------------------
-
-# # USeg
-# start = time.time()
-# print('useg')
-
-# output_dict = useg(
-#     raw,
-#     binning,
-#     ridge_size,
-#     thresh_coeff, 
-#     small_cell_cutoff, 
-#     large_cell_cutoff, 
-#     remove_border_cells,
-#     )
-
-# end = time.time()
-# print(f'  {(end-start):5.3f} s')
+end = time.time()
+print(f'  {(end-start):5.3f} s')
 
 # -----------------------------------------------------------------------------
 
@@ -481,3 +256,49 @@ def useg(
 # viewer.add_image(output_dict['wat'], blending='additive', colormap='red')
 
 #%% Test ----------------------------------------------------------------------
+
+bound_int_cutoff = 1.5
+
+rsize = output_dict['rsize'][0]
+labels = output_dict['labels'][0]
+wat = output_dict['wat'][0]
+rsize_norm = output_dict['rsize_norm'][0]
+bound_labels = output_dict['bound_labels'][0]
+vertices = output_dict['vertices'][0]
+
+start = time.time()
+print('test')
+
+# Get bound properties
+idx, lab, count = rprops(bound_labels)
+
+# Get rsize_norm intensities with bounds  
+temp_int = [np.mean(rsize_norm[idx[i]]) for i in range(len(idx))]
+bound_int = np.zeros_like(rsize)
+for i in range(1,len(idx)):
+    bound_int[idx[i]] = temp_int[i]
+
+# Remove weak bounds
+temp1 = labels!=0
+temp2 = 0 < bound_int < bound_int_cutoff
+
+
+# wat_filt = wat.copy()
+# if bound_int_cutoff > 0:
+#     wat_filt[bound_int < bound_int_cutoff] = 0
+#     wat_filt += vertices
+    
+
+
+end = time.time()
+print(f'  {(end-start):5.3f} s')
+
+# import matplotlib.pyplot as plt
+# plt.hist(temp_int, bins = 50)
+
+viewer = napari.Viewer()
+viewer.add_image(temp1)
+viewer.add_image(temp2)
+
+# viewer.add_image(wat, colormap='red')
+# viewer.add_image(wat_filt, blending='additive')
