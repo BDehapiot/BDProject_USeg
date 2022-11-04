@@ -132,8 +132,15 @@ def get_watershed(
         bound_int = np.zeros_like(rsize)
         for i in range(1,len(idx)):
             bound_int[idx[i]] = temp_int[i]
+            
+        # Remove weak bounds
+        wat_filt = wat.copy()
+        if bound_int_cutoff > 0:
+            wat_filt[bound_int < bound_int_cutoff] = 0
+            wat_filt += vertices   
+            wat_filt = labconn(wat_filt, labels=None, conn=2) > 1
         
-        return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels, rsize_norm, bound_int
+        return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels, rsize_norm, bound_int, wat_filt
     
     # Run ---------------------------------------------------------------------
     
@@ -188,6 +195,8 @@ def get_watershed(
             [data[8] for data in output_list], axis=0).squeeze(),
         'bound_int': np.stack(
             [data[9] for data in output_list], axis=0).squeeze(),
+        'wat_filt': np.stack(
+            [data[10] for data in output_list], axis=0).squeeze(),
         }
     
     return output_dict
@@ -257,48 +266,40 @@ print(f'  {(end-start):5.3f} s')
 
 #%% Test ----------------------------------------------------------------------
 
-bound_int_cutoff = 1.5
+# bound_int_cutoff = 1.5
 
-rsize = output_dict['rsize'][0]
-labels = output_dict['labels'][0]
-wat = output_dict['wat'][0]
-rsize_norm = output_dict['rsize_norm'][0]
-bound_labels = output_dict['bound_labels'][0]
-vertices = output_dict['vertices'][0]
+# rsize = output_dict['rsize'][0]
+# labels = output_dict['labels'][0]
+# wat = output_dict['wat'][0]
+# rsize_norm = output_dict['rsize_norm'][0]
+# bound_labels = output_dict['bound_labels'][0]
+# vertices = output_dict['vertices'][0]
 
-start = time.time()
-print('test')
+# start = time.time()
+# print('test')
 
-# Get bound properties
-idx, lab, count = rprops(bound_labels)
+# # Get bound properties
+# idx, lab, count = rprops(bound_labels)
 
-# Get rsize_norm intensities with bounds  
-temp_int = [np.mean(rsize_norm[idx[i]]) for i in range(len(idx))]
-bound_int = np.zeros_like(rsize)
-for i in range(1,len(idx)):
-    bound_int[idx[i]] = temp_int[i]
+# # Get rsize_norm intensities with bounds  
+# temp_int = [np.mean(rsize_norm[idx[i]]) for i in range(len(idx))]
+# bound_int = np.zeros_like(rsize)
+# for i in range(1,len(idx)):
+#     bound_int[idx[i]] = temp_int[i]
 
-# Remove weak bounds
-temp1 = labels!=0
-temp2 = 0 < bound_int < bound_int_cutoff
-
-
+# # Remove weak bounds
 # wat_filt = wat.copy()
 # if bound_int_cutoff > 0:
 #     wat_filt[bound_int < bound_int_cutoff] = 0
-#     wat_filt += vertices
-    
+#     wat_filt += vertices   
+#     wat_filt = labconn(wat_filt, labels=None, conn=2) > 1
 
+# end = time.time()
+# print(f'  {(end-start):5.3f} s')
 
-end = time.time()
-print(f'  {(end-start):5.3f} s')
+# # import matplotlib.pyplot as plt
+# # plt.hist(temp_int, bins = 50)
 
-# import matplotlib.pyplot as plt
-# plt.hist(temp_int, bins = 50)
-
-viewer = napari.Viewer()
-viewer.add_image(temp1)
-viewer.add_image(temp2)
-
+# viewer = napari.Viewer()
 # viewer.add_image(wat, colormap='red')
 # viewer.add_image(wat_filt, blending='additive')
