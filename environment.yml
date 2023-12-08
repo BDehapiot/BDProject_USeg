@@ -1,18 +1,20 @@
 name: USeg
 
 channels:
-    - conda-forge
-    - anaconda
+  - conda-forge
     
 dependencies:
-    - python=3.9
-    - pyqt=5.12.3
-    - pip
-    - numpy
-    - pandas
-    - scipy
-    - scikit-image
-    - matplotlib-base
-    - joblib
-    - openpiv
-    - napari
+  - python=3.10
+  - numpy=1.24*
+  - numba
+  - scipy
+  - pandas
+  - scikit-image
+  - scikit-learn
+  - opencv
+  - joblib
+  - matplotlib-base
+  - spyder
+  - pip
+  - pip:
+    - napari[all]
