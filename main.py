@@ -13,22 +13,11 @@ from skimage.restoration import rolling_ball
 from skimage.measure import label, regionprops
 from skimage.segmentation import watershed, clear_border
 from skimage.filters import sato, threshold_li, gaussian
-from skimage.morphology import binary_dilation, remove_small_objects, square, disk
+from skimage.morphology import binary_dilation, remove_small_objects, square
 
-#%% Initialize ----------------------------------------------------------------
-
-data_path = Path('data')
-raw_name = "13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif"
-raw = io.imread(data_path / raw_name)
-
-#%% Parameters ----------------------------------------------------------------
-
-binning = 2
-ridge_size = 3
-thresh_coeff = 0.5
-
-# Rescale parameters acc. to binning
-ridge_size /= binning
+# Custom
+from skel import labconn
+from nan import nanreplace
 
 #%% Functions -----------------------------------------------------------------
 
@@ -62,7 +51,7 @@ def get_wat(
         
         # Apply ridge filter 
         ridges = sato(
-            rsize, sigmas=ridge_size, mode='reflect', black_ridges=False,
+            rsize, sigmas=[ridge_size], mode='reflect', black_ridges=False,
             )
         
         # Get mask
@@ -119,7 +108,7 @@ def get_wat(
         wat = np.minimum(wat, temp)
         
         # Get vertices
-        vertices = labconn(wat, labels=labels, conn=2) > 2
+        vertices = labconn(wat, conn=2) > 2
         
         # Get bounds & endpoints
         bounds = wat.copy()
@@ -129,7 +118,8 @@ def get_wat(
         # Label bounds
         bound_labels = label(bounds, connectivity=2).astype('float')
         bound_labels[endpoints == 1] = np.nan
-        bound_labels = nanreplace(bound_labels, 3, 'max')
+        bound_labels = nanreplace(
+            bound_labels, kernel_size=3, filt_method='max')
         bound_labels = bound_labels.astype('int')
         small_bounds = wat ^ (bound_labels > 0) ^ vertices
         small_bound_labels = label(small_bounds, connectivity=2)
@@ -141,7 +131,10 @@ def get_wat(
         rsize_bg = rsize.copy().astype('float')
         rsize_bg[mask==1] = np.nan        
         rsize_bg = nanreplace(
-            rsize_bg, int(np.ceil(ridge_size*4)//2*2+1), 'mean')
+            rsize_bg, 
+            kernel_size=int(np.ceil(ridge_size * 4) // 2 * 2 + 1),
+            filt_method='mean'
+            )
 
         # Get bound intensities
         props = regionprops(
@@ -157,7 +150,7 @@ def get_wat(
             for i, j in zip(props, props_bg)]),
             columns = ['frame', 'idx', 'bound', 'bg'],
             )
-        bound_info['ratio'] = bound_info['bound']/bound_info['bg']        
+        bound_info['ratio'] = bound_info['bound'] / bound_info['bg']        
         
         return rsize, ridges, mask, markers, labels, wat, vertices, bound_labels, cell_info, bound_info
     
@@ -169,7 +162,7 @@ def get_wat(
         raw = raw.reshape((1, raw.shape[0], raw.shape[1]))  
         
     # Adjust parameters according to binning
-    ridge_size = ridge_size/binning
+    ridge_size = ridge_size / binning
     
     if parallel:
     
@@ -191,7 +184,7 @@ def get_wat(
             ]
         
     # Extract output dictionary
-    output_dict = {
+    outputs = {
         'rsize': np.stack(
             [data[0] for data in output_list], axis=0).squeeze(),
         'ridges': np.stack(
@@ -214,30 +207,54 @@ def get_wat(
             [(data[9]) for i, data in enumerate(output_list)]),        
         }
             
-    return output_dict
+    return outputs
 
 #%% Execute -------------------------------------------------------------------
 
-print("  get_wat   :", end='')
-t0 = time.time()
+# File name
+raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
+# raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
+# raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
+# raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
+# raw_name = 'Disc_Fixed_118hAEL_disc04_uint8.tif'
+# raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
+# raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
-outputs = Parallel(n_jobs=-1)(
-    delayed(_get_wat)(img)
-    for img in raw
+# Parameters
+binning = 2
+ridge_size = 4
+thresh_coeff = 0.5
+small_cell_cutoff = 3
+large_cell_cutoff = 10
+remove_border_cells = False
+
+# Open data
+raw = io.imread(Path('data', raw_name))
+
+# Process data (get_wat)
+start = time.time()
+print('get_wat')
+
+outputs = get_wat(
+    raw, binning, ridge_size, thresh_coeff, 
+    small_cell_cutoff, large_cell_cutoff,
+    remove_border_cells=remove_border_cells, 
+    parallel=True
     )
-rsize = np.stack([data[0] for data in outputs])
-ridges = np.stack([data[1] for data in outputs])
-mask = np.stack([data[2] for data in outputs])
-markers = np.stack([data[3] for data in outputs])
 
-t1 = time.time()
-print(f" {(t1-t0):<5.2f}s")
+end = time.time()
+print(f'  {(end-start):5.3f} s')
 
 # -----------------------------------------------------------------------------
 
 import napari
 viewer = napari.Viewer()
-viewer.add_image(rsize)
-viewer.add_image(ridges)
-viewer.add_image(mask)
+viewer.add_image(outputs["rsize"])
+viewer.add_image(outputs["ridges"])
+viewer.add_image(outputs["mask"])
+viewer.add_labels(outputs["markers"])
+viewer.add_labels(outputs["labels"])
+viewer.add_image(outputs["wat"])
+viewer.add_image(outputs["vertices"])
+viewer.add_labels(outputs["bound_labels"])
 # viewer.add_image(markers)
