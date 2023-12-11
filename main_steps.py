@@ -41,7 +41,7 @@ raw = io.imread(raw_path)
 binning = 2
 ridge_size = 4
 thresh_coeff = 0.5
-small_cell_cutoff = 3
+small_cell_cutoff = 5
 large_cell_cutoff = 10
 remove_border_cells = False
 
@@ -52,6 +52,8 @@ def get_wat(
         binning, 
         ridge_size, 
         thresh_coeff, 
+        small_cell_cutoff,
+        large_cell_cutoff,
         parallel=False
         ):
 
@@ -88,19 +90,19 @@ def get_wat(
         for i in range(len(cell_info)):
             
             # Detect & remove small cells
-            if cell_info.loc[i,'area'] < median/small_cell_cutoff: 
+            if cell_info.loc[i,'area'] < median / small_cell_cutoff: 
                 cell_info.loc[i,'valid'] = 1
                 markers[markers==cell_info['idx'][i]] = 0  
             
             # Detect large cells
-            if cell_info.loc[i,'area'] > median*large_cell_cutoff: 
+            if cell_info.loc[i,'area'] > median * large_cell_cutoff: 
                 cell_info.loc[i,'valid'] = 2                
                 
         # Get watershed labels
         labels = watershed(
             ridges, 
             markers, 
-            compactness=10/binning, 
+            compactness=10 / binning, 
             watershed_line=True
             ) 
 
@@ -128,7 +130,52 @@ def get_wat(
         # Get vertices
         vertices = labconn(wat, conn=2) > 2
         
-        return rsize, ridges, mask, markers, labels, wat, vertices
+        # # Get bounds & endpoints
+        # bounds = wat.copy()
+        # bounds[binary_dilation(vertices, square(3)) == 1] = 0
+        # endpoints = wat ^ bounds ^ vertices
+        
+        # # Label bounds
+        # bound_labels = label(bounds, connectivity=2).astype('float')
+        # bound_labels[endpoints == 1] = np.nan
+        # bound_labels = nanreplace(
+        #     bound_labels, kernel_size=3, filt_method='max', parallel=False)
+        # bound_labels = bound_labels.astype('int')
+        # small_bounds = wat ^ (bound_labels > 0) ^ vertices
+        # small_bound_labels = label(small_bounds, connectivity=2)
+        # small_bound_labels = small_bound_labels + np.max(bound_labels)
+        # small_bound_labels[small_bound_labels == np.max(bound_labels)] = 0
+        # bound_labels = bound_labels + small_bound_labels
+        
+        # # Get background
+        # rsize_bg = rsize.copy().astype('float')
+        # rsize_bg[mask == 1] = np.nan        
+        # rsize_bg = nanreplace(
+        #     rsize_bg, 
+        #     kernel_size=int(np.ceil(ridge_size * 4) // 2 * 2 + 1),
+        #     filt_method='mean'
+        #     )
+
+        # # Get bound intensities
+        # props = regionprops(
+        #     bound_labels, 
+        #     intensity_image=(gaussian(rsize, ridge_size))
+        #     )
+        # props_bg = regionprops(
+        #     bound_labels, 
+        #     intensity_image=(gaussian(rsize_bg, ridge_size))
+        #     )
+        # bound_info = pd.DataFrame(([
+        #     (frame, i.label, i.intensity_mean, j.intensity_mean) 
+        #     for i, j in zip(props, props_bg)]),
+        #     columns = ['frame', 'idx', 'bound', 'bg'],
+        #     )
+        # bound_info['ratio'] = bound_info['bound'] / bound_info['bg']  
+        
+        return (
+            rsize, ridges, mask, markers, labels, wat, vertices, #bound_labels,
+            #cell_info, bound_info
+            )
         
     # Main function -----------------------------------------------------------
 
@@ -155,16 +202,29 @@ def get_wat(
             for frame, img in enumerate(raw)
             ]
         
-    # 
+    # Append data dict.
     data = {
-        "rsize"    : np.stack([output[0] for output in outputs]),
-        "ridges"   : np.stack([output[1] for output in outputs]),
-        "mask"     : np.stack([output[2] for output in outputs]),
-        "markers"  : np.stack([output[3] for output in outputs]),
-        "labels"   : np.stack([output[4] for output in outputs]),
-        "wat"      : np.stack([output[5] for output in outputs]),
-        "vertices" : np.stack([output[6] for output in outputs]),
+        'rsize': np.stack(
+            [data[0] for data in outputs], axis=0).squeeze(),
+        'ridges': np.stack(
+            [data[1] for data in outputs], axis=0).squeeze(),
+        'mask': np.stack(
+            [data[2] for data in outputs], axis=0).squeeze(),
+        'markers': np.stack(
+            [data[3] for data in outputs], axis=0).squeeze(),
+        'labels': np.stack(
+            [data[4] for data in outputs], axis=0).squeeze(),
+        'wat': np.stack(
+            [data[5] for data in outputs], axis=0).squeeze(),
+        'vertices': np.stack(
+            [data[6] for data in outputs], axis=0).squeeze(),
 
+        # 'bound_labels': np.stack(
+        #     [data[7] for data in outputs], axis=0).squeeze(),
+        # 'cell_info' : pd.concat(
+        #     [(data[8]) for i, data in enumerate(outputs)]),
+        # 'bound_info' : pd.concat(
+        #     [(data[9]) for i, data in enumerate(outputs)]),        
         }
     
     return data
@@ -175,7 +235,11 @@ print("get_wat:", end='')
 t0 = time.time()
 
 data = get_wat(
-    raw, binning, ridge_size, thresh_coeff, 
+    raw, binning, 
+    ridge_size, 
+    thresh_coeff,
+    small_cell_cutoff,
+    large_cell_cutoff,
     parallel=True
     )
 
@@ -193,7 +257,41 @@ print(f" {(t1-t0):<5.2f}s")
 
 #%% Experiment ----------------------------------------------------------------
 
+labels = data["labels"][0]
+wat = data["wat"][0]
+vertices = data["vertices"][0]
 
+# -----------------------------------------------------------------------------
+
+from skimage.filters.rank import maximum
+
+# -----------------------------------------------------------------------------
+
+print("Bounds & endpoints :", end='')
+t0 = time.time()
+
+# Get bounds & endpoints
+bounds = wat.copy()
+bounds[binary_dilation(vertices, square(3)) == 1] = 0
+endpoints = wat ^ bounds ^ vertices
+
+t1 = time.time()
+print(f" {(t1-t0):<5.5f}s")
+
+print("Label bounds       :", end='')
+t0 = time.time()
+
+# Label bounds
+bound_labels = label(bounds, connectivity=2).astype('float')
+bound_labels[endpoints == 1] = np.nan
+
+bound_labels1 = nanreplace(
+    bound_labels, kernel_size=3, filt_method='max', parallel=False)
+
+bound_labels2 = maximum(bound_labels.astype("uint16"), footprint=square(3))
+
+t1 = time.time()
+print(f" {(t1-t0):<5.5f}s")
 
 #%% Save ----------------------------------------------------------------------
   
@@ -231,4 +329,9 @@ io.imsave(
     Path("data", "temp", raw_path.stem + "_vertices.tif"),
     data["vertices"].astype("uint8") * 255, check_contrast=False,
     )
+
+# io.imsave(
+#     Path("data", "temp", raw_path.stem + "_bound_labels.tif"),
+#     data["bound_labels"].astype("uint16"), check_contrast=False,
+#     )
 
