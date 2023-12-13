@@ -11,8 +11,8 @@ from joblib import Parallel, delayed
 from skimage.restoration import rolling_ball
 from skimage.measure import label, regionprops
 from skimage.transform import downscale_local_mean
-from skimage.segmentation import watershed, clear_border
 from skimage.filters import sato, threshold_li, gaussian
+from skimage.segmentation import watershed, clear_border, expand_labels
 from skimage.morphology import binary_dilation, remove_small_objects, square
 
 # Custom
@@ -130,31 +130,37 @@ def get_wat(
         # Get vertices
         vertices = labconn(wat, conn=2) > 2
         
-        # # Get bounds & endpoints
-        # bounds = wat.copy()
-        # bounds[binary_dilation(vertices, square(3)) == 1] = 0
-        # endpoints = wat ^ bounds ^ vertices
+        # Get bounds & endpoints
+        bounds = wat.copy()
+        bounds[binary_dilation(vertices, square(3)) == 1] = 0
+        endpoints = wat ^ bounds ^ vertices
         
-        # # Label bounds
-        # bound_labels = label(bounds, connectivity=2).astype('float')
-        # bound_labels[endpoints == 1] = np.nan
+        # Label bounds
+        bound_labels = label(bounds, connectivity=2).astype('float')
+        
+        # bound_labels[endpoints == 1] = np.nan       
         # bound_labels = nanreplace(
         #     bound_labels, kernel_size=3, filt_method='max', parallel=False)
-        # bound_labels = bound_labels.astype('int')
-        # small_bounds = wat ^ (bound_labels > 0) ^ vertices
-        # small_bound_labels = label(small_bounds, connectivity=2)
-        # small_bound_labels = small_bound_labels + np.max(bound_labels)
-        # small_bound_labels[small_bound_labels == np.max(bound_labels)] = 0
-        # bound_labels = bound_labels + small_bound_labels
         
-        # # Get background
-        # rsize_bg = rsize.copy().astype('float')
-        # rsize_bg[mask == 1] = np.nan        
-        # rsize_bg = nanreplace(
-        #     rsize_bg, 
-        #     kernel_size=int(np.ceil(ridge_size * 4) // 2 * 2 + 1),
-        #     filt_method='mean'
-        #     )
+        bound_labels[endpoints == 1] = 0   
+        bound_labels = expand_labels(bound_labels, distance=1.5)
+        
+        bound_labels = bound_labels.astype('int')
+        small_bounds = wat ^ (bound_labels > 0) ^ vertices
+        small_bound_labels = label(small_bounds, connectivity=2)
+        small_bound_labels = small_bound_labels + np.max(bound_labels)
+        small_bound_labels[small_bound_labels == np.max(bound_labels)] = 0
+        bound_labels = bound_labels + small_bound_labels
+        
+        # Get background
+        rsize_bg = rsize.copy().astype('float')
+        rsize_bg[mask == 1] = np.nan        
+        rsize_bg = nanreplace(
+            rsize_bg, 
+            kernel_size=int(np.ceil(ridge_size * 4) // 2 * 2 + 1),
+            filt_method='mean', 
+            parallel=False,
+            )
 
         # # Get bound intensities
         # props = regionprops(
@@ -257,41 +263,28 @@ print(f" {(t1-t0):<5.2f}s")
 
 #%% Experiment ----------------------------------------------------------------
 
-labels = data["labels"][0]
-wat = data["wat"][0]
-vertices = data["vertices"][0]
+idx = 4
+rsize = data["rsize"][idx]
+mask = data["mask"][idx]
+# wat = data["wat"][idx]
 
 # -----------------------------------------------------------------------------
 
-from skimage.filters.rank import maximum
+# -----------------------------------------------------------------------------
+
+rsize_bg = rsize.copy().astype('float')
+rsize_bg[mask == 1] = np.nan  
+
 
 # -----------------------------------------------------------------------------
 
-print("Bounds & endpoints :", end='')
-t0 = time.time()
+# print("Process :", end='')
+# t0 = time.time()
 
-# Get bounds & endpoints
-bounds = wat.copy()
-bounds[binary_dilation(vertices, square(3)) == 1] = 0
-endpoints = wat ^ bounds ^ vertices
 
-t1 = time.time()
-print(f" {(t1-t0):<5.5f}s")
+# t1 = time.time()
+# print(f" {(t1-t0):<5.5f}s")
 
-print("Label bounds       :", end='')
-t0 = time.time()
-
-# Label bounds
-bound_labels = label(bounds, connectivity=2).astype('float')
-bound_labels[endpoints == 1] = np.nan
-
-bound_labels1 = nanreplace(
-    bound_labels, kernel_size=3, filt_method='max', parallel=False)
-
-bound_labels2 = maximum(bound_labels.astype("uint16"), footprint=square(3))
-
-t1 = time.time()
-print(f" {(t1-t0):<5.5f}s")
 
 #%% Save ----------------------------------------------------------------------
   
