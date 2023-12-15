@@ -28,12 +28,12 @@ from nan import nanreplace
 #%% Execute -------------------------------------------------------------------
 
 # Paths
-raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
+# raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8.tif'
 # raw_name = '13-12-06_40x_GBE_eCad_Ctrl_#19_uint8_lite.tif'
 # raw_name = '13-03-06_40x_GBE_eCad(Carb)_Ctrl_#98_uint8.tif'
 # raw_name = '18-03-12_100x_GBE_UtrCH_Ctrl_b3_uint8.tif'
 # raw_name = '17-12-18_100x_DC_UtrCH_Ctrl_b3_uint8.tif'
-# raw_name = 'Disc_Fixed_118hAEL_disc04_uint8.tif'
+raw_name = 'Disc_Fixed_118hAEL_disc04_uint8.tif'
 # raw_name = 'Disc_Fixed_118hAEL_disc04_uint8_crop.tif'
 # raw_name = 'Disc_ex_vivo_118hAEL_disc2_uint8.tif'
 
@@ -258,13 +258,33 @@ print(f" {(t1-t0):<5.2f}s")
 
 #%% Experiment ----------------------------------------------------------------
 
+# -----------------------------------------------------------------------------
 
+img = data["rsize"]
+# mask = data["mask"]
+mask = ~data["mask"]
+sigma = 20
 
-# Get temp_mask
-temp_mask = labels > 0
-temp_mask = binary_dilation(
-    temp_mask, footprint=disk(ridge_size)
+def masked_gaussian(img, sigma, mask):
+
+    np.seterr(divide='ignore', invalid='ignore')
+
+    img = img.astype(float)
+    img[mask == 0] = 0
+    img = gaussian(img, sigma=sigma, preserve_range=True)
+    mask = mask.astype(int)
+    mask = gaussian(mask, sigma=sigma, preserve_range=True)
+    return img / mask
+
+io.imsave(
+    Path("data", "temp", raw_path.stem + "_mask_blur.tif"),
+    mask_blur.astype("float32"), check_contrast=False,
     )
+
+# -----------------------------------------------------------------------------
+
+temp_mask = data["mask"]#[0]
+rsize = data["rsize"]#[0]
 
 # Get bg_blur (with a nan ignoring Gaussian blur)
 temp1 = rsize.astype('float')
@@ -272,18 +292,26 @@ temp1[temp_mask == 0] = np.nan
 
 temp2 = temp1.copy()
 temp2[np.isnan(temp2)] = 0
-temp2_blur = gaussian(temp2, sigma=ridge_size*10)
+temp2_blur = gaussian(temp2, sigma=ridge_size * 10)
 
 temp3 = 0 * temp1.copy() + 1
 temp3[np.isnan(temp3)] = 0
-temp3_blur = gaussian(temp3, sigma=ridge_size*10)
+temp3_blur = gaussian(temp3, sigma=ridge_size * 10)
 
 np.seterr(divide='ignore', invalid='ignore')
 bg_blur = temp2_blur / temp3_blur
 
 # Get rsize_blur (divided by bg_blur)
-bound_norm = gaussian(rsize, sigma=ridge_size//2)
-bound_norm = bound_norm / bg_blur *1.5
+# bound_norm = gaussian(rsize, sigma=ridge_size//2)
+# bound_norm = bound_norm / bg_blur * 1.5
+
+bound_norm = rsize / bg_blur * 1.5
+
+
+io.imsave(
+    Path("data", "temp", raw_path.stem + "_bound_norm.tif"),
+    bound_norm.astype("float32"), check_contrast=False,
+    )
 
 # from sklearn.mixture import GaussianMixture
 
