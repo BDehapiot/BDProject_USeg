@@ -137,11 +137,6 @@ def get_wat(
         
         # Label bounds
         bound_labels = label(bounds, connectivity=2).astype('float')
-        
-        # bound_labels[endpoints == 1] = np.nan       
-        # bound_labels = nanreplace(
-        #     bound_labels, kernel_size=3, filt_method='max', parallel=False)
-        
         bound_labels[endpoints == 1] = 0   
         bound_labels = expand_labels(bound_labels, distance=1.5)
         
@@ -151,36 +146,22 @@ def get_wat(
         small_bound_labels = small_bound_labels + np.max(bound_labels)
         small_bound_labels[small_bound_labels == np.max(bound_labels)] = 0
         bound_labels = bound_labels + small_bound_labels
-        
-        # Get background
-        rsize_bg = rsize.copy().astype('float')
-        rsize_bg[mask == 1] = np.nan        
-        rsize_bg = nanreplace(
-            rsize_bg, 
-            kernel_size=int(np.ceil(ridge_size * 4) // 2 * 2 + 1),
-            filt_method='mean', 
-            parallel=False,
+
+        # Get bound intensities
+        props = regionprops(
+            bound_labels, 
+            intensity_image=(gaussian(rsize, ridge_size))
             )
 
-        # # Get bound intensities
-        # props = regionprops(
-        #     bound_labels, 
-        #     intensity_image=(gaussian(rsize, ridge_size))
-        #     )
-        # props_bg = regionprops(
-        #     bound_labels, 
-        #     intensity_image=(gaussian(rsize_bg, ridge_size))
-        #     )
-        # bound_info = pd.DataFrame(([
-        #     (frame, i.label, i.intensity_mean, j.intensity_mean) 
-        #     for i, j in zip(props, props_bg)]),
-        #     columns = ['frame', 'idx', 'bound', 'bg'],
-        #     )
-        # bound_info['ratio'] = bound_info['bound'] / bound_info['bg']  
+        bound_info = pd.DataFrame(([
+            (frame, prop.label, prop.intensity_mean) 
+            for prop in props]),
+            columns = ['frame', 'idx', 'int'],
+            )
         
         return (
-            rsize, ridges, mask, markers, labels, wat, vertices, #bound_labels,
-            #cell_info, bound_info
+            rsize, ridges, mask, markers, labels, wat, vertices, bound_labels,
+            cell_info, bound_info
             )
         
     # Main function -----------------------------------------------------------
@@ -224,13 +205,12 @@ def get_wat(
             [data[5] for data in outputs], axis=0).squeeze(),
         'vertices': np.stack(
             [data[6] for data in outputs], axis=0).squeeze(),
-
-        # 'bound_labels': np.stack(
-        #     [data[7] for data in outputs], axis=0).squeeze(),
-        # 'cell_info' : pd.concat(
-        #     [(data[8]) for i, data in enumerate(outputs)]),
-        # 'bound_info' : pd.concat(
-        #     [(data[9]) for i, data in enumerate(outputs)]),        
+        'bound_labels': np.stack(
+            [data[7] for data in outputs], axis=0).squeeze(),
+        'cell_info' : pd.concat(
+            [(data[8]) for i, data in enumerate(outputs)]),
+        'bound_info' : pd.concat(
+            [(data[9]) for i, data in enumerate(outputs)]),        
         }
     
     return data
@@ -263,28 +243,15 @@ print(f" {(t1-t0):<5.2f}s")
 
 #%% Experiment ----------------------------------------------------------------
 
-idx = 4
-rsize = data["rsize"][idx]
-mask = data["mask"][idx]
-# wat = data["wat"][idx]
+import matplotlib.pyplot as plt
 
 # -----------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-
-rsize_bg = rsize.copy().astype('float')
-rsize_bg[mask == 1] = np.nan  
-
+bound_info = data["bound_info"]
 
 # -----------------------------------------------------------------------------
 
-# print("Process :", end='')
-# t0 = time.time()
-
-
-# t1 = time.time()
-# print(f" {(t1-t0):<5.5f}s")
-
+plt.hist(bound_info['int'], bins=100, edgecolor='black')
 
 #%% Save ----------------------------------------------------------------------
   
@@ -323,8 +290,8 @@ io.imsave(
     data["vertices"].astype("uint8") * 255, check_contrast=False,
     )
 
-# io.imsave(
-#     Path("data", "temp", raw_path.stem + "_bound_labels.tif"),
-#     data["bound_labels"].astype("uint16"), check_contrast=False,
-#     )
+io.imsave(
+    Path("data", "temp", raw_path.stem + "_bound_labels.tif"),
+    data["bound_labels"].astype("uint16"), check_contrast=False,
+    )
 
